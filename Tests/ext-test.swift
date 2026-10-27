@@ -957,6 +957,21 @@ struct ExtensionTests {
             "deeplink decodes arguments JSON",
             args?.arguments == ["title": "Triage"], String(describing: args?.arguments))
 
+        let withContext = ExtensionDeepLink.parse(
+            url: URL(
+                string:
+                    "raycast://extensions/demo/search?context=%7B%22id%22%3A7%2C%22tags%22%3A%5B%22a%22%5D%7D"
+            )!)
+        check(
+            "deeplink decodes context JSON as launchContext",
+            withContext?.context == ["id": .number(7), "tags": .array([.string("a")])],
+            String(describing: withContext?.context))
+        check(
+            "deeplink without context has none",
+            ExtensionDeepLink.parse(url: URL(string: "raycast://extensions/demo/search")!)?.context
+                == [:])
+        check("deeplink ignores malformed context", ExtensionDeepLink.parseContext("[1]") == [:])
+
         let coerced = ExtensionDeepLink.parseArguments(#"{"q":"","n":3,"flag":true}"#)
         check(
             "deeplink coerces non-string arguments",
