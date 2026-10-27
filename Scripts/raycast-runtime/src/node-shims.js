@@ -1548,11 +1548,26 @@ const querystring = {
     return out;
   },
   stringify(object) {
+    // Node coerces anything but a string, finite number, bigint or boolean to "" — google-auth-library
+    // relies on it: a client without a secret sends `client_secret=`, never `client_secret=undefined`.
+    const coerce = (value) => {
+      switch (typeof value) {
+        case "string":
+          return value;
+        case "number":
+          return Number.isFinite(value) ? String(value) : "";
+        case "bigint":
+        case "boolean":
+          return String(value);
+        default:
+          return "";
+      }
+    };
     const params = new URLSearchParams();
     for (const key of Object.keys(object || {})) {
       const value = object[key];
-      if (Array.isArray(value)) for (const item of value) params.append(key, item);
-      else params.append(key, value);
+      if (Array.isArray(value)) for (const item of value) params.append(key, coerce(item));
+      else params.append(key, coerce(value));
     }
     return params.toString();
   },
