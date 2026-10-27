@@ -1,0 +1,88 @@
+diff --git a/Tinycast/Features/Launcher/UI/LauncherList.swift b/Tinycast/Features/Launcher/UI/LauncherList.swift
+index c95856f66ab21a904e735048b9086616b8f8ecdb..f4a8c9883d83bc9b601de5a63b41e190ac933b1d 100644
+--- a/Tinycast/Features/Launcher/UI/LauncherList.swift
++++ b/Tinycast/Features/Launcher/UI/LauncherList.swift
+@@ -10,6 +10,9 @@ struct LauncherList: View {
+     let meetingCount: Int
+     let suggestionCount: Int
+     let matchCount: Int
++    /// A query is typed, so ⌘1–⌘9 open the first results instead of favorites.
++    let numbersResults: Bool
++    static let numberedResultLimit = 9
+     /// Changes only when the list should scroll, so mouse selection never yanks it.
+     let scroll: ScrollIntent
+     /// The card at flat index 0, when one leads. At most one ever does.
+@@ -183,7 +186,7 @@ struct LauncherList: View {
+                                         app: app,
+                                         selected: app.id == selectedRowID,
+                                         running: runningApps.isRunning(app),
+-                                        slot: nil
++                                        slot: resultSlot(app, in: rows)  // tinycast-space
+                                     )
+                                     .contentShape(Rectangle())
+                                     .onRowTap(drag: drag(for: app)) { onActivate(app) }
+@@ -381,3 +384,18 @@ private struct AppRow: View {
+         .armedHover($hovered)
+     }
+ }
++
++// tinycast-space: while a query is typed no favorite is pinned, so the first nine entry rows show
++// ⌘1–⌘9 instead; `LauncherScreen.launchFavorite` opens the same rows.
++extension LauncherList {
++    private func resultSlot(_ app: AppEntry, in rows: [Row]) -> Character? {
++        guard numbersResults else { return nil }
++        var number = 0
++        for case .app(let entry) in rows {
++            guard number < Self.numberedResultLimit else { return nil }
++            if entry.id == app.id { return FavoriteSlots.digit(at: number) }
++            number += 1
++        }
++        return nil
++    }
++}
+diff --git a/Tinycast/Features/Launcher/UI/LauncherScreen.swift b/Tinycast/Features/Launcher/UI/LauncherScreen.swift
+index 3955fef3196a669d7fc205cb1f899fae3266d050..9566e21591caf3804117b61fc9b4c93407c902f1 100644
+--- a/Tinycast/Features/Launcher/UI/LauncherScreen.swift
++++ b/Tinycast/Features/Launcher/UI/LauncherScreen.swift
+@@ -419,8 +419,16 @@ struct LauncherScreen: PaletteScreen {
+         return true
+     }
+ 
+-    /// ⌘1–⌘9/⌘0 — launch a favorite by position, in either palette size.
++    /// ⌘1–⌘9/⌘0 — launch a favorite by position, in either palette size. While a query is
++    /// typed no favorite is pinned, so ⌘1–⌘9 open that many results down instead.
+     private func launchFavorite(at index: Int) -> Bool {
++        if !pinsFavorites {
++            guard index < LauncherList.numberedResultLimit,
++                let row = rows.indices.filter({ entry(at: $0) != nil }).dropFirst(index).first
++            else { return false }
++            activate(at: row)
++            return true
++        }
+         guard pinnedFavorites.indices.contains(index) else { return false }
+         activate(at: index + (leadCard == nil ? 0 : 1))
+         return true
+@@ -527,6 +535,7 @@ struct LauncherScreen: PaletteScreen {
+             meetingCount: meetingCount,
+             suggestionCount: suggestionCount,
+             matchCount: matchCount,
++            numbersResults: !pinsFavorites,
+             scroll: scroll,
+             card: leadCard,
+             cardSelected: isCardSelected(selection),
+diff --git a/Tinycast/Palette/PaletteCoordinator.swift b/Tinycast/Palette/PaletteCoordinator.swift
+index 152ffce1a76b6308c92ba57c535d383d9b748e58..e44e22312d707217b6ffaae161c75bd813edd9e2 100644
+--- a/Tinycast/Palette/PaletteCoordinator.swift
++++ b/Tinycast/Palette/PaletteCoordinator.swift
+@@ -55,8 +55,10 @@ final class PaletteCoordinator {
+         windowController.isVisible && palette.mode == mode
+     }
+ 
++    /// A visible palette hides whatever screen is up; the summon after it restores that screen
++    /// until Pop to Root Search expires, so the pair reads as minimise and restore.
+     func togglePalette() {
+-        if isShowing(.launcher) {
++        if isVisible {
+             hidePalette()
+         } else {
+             showPalette(mode: .launcher, restoreAnyMode: true)
