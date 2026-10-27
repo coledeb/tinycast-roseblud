@@ -1174,6 +1174,7 @@ struct RootPaletteView: View {
         vm.menuQuery = ""
         // Stated here rather than mirrored later: the window delegate reads it during this turn.
         vm.menuOpen = false
+        InlineEntryEditor.shared.end(stoppingRecordingIn: core)  // tinycast-space
     }
 
     private func openInputOptions(
@@ -1402,6 +1403,8 @@ struct RootPaletteView: View {
     private func activateMenuItem(_ index: Int) {
         guard let content = menuContent, (0..<content.rowCount).contains(index) else { return }
         guard content.isSelectable(index) else { return }
+        // tinycast-space: a row that edits in place keeps its menu up. See InlineEntryEditor.
+        if content.keepsOpen(index) { return content.activate(index) }
         // Close first: an action opening a window must find the palette key, or nothing hides it.
         closeMenus()
         // A mouse click on a row takes the caret with it; menus close back into the field.
