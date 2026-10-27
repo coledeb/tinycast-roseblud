@@ -423,7 +423,10 @@ final class AppCore {
                 return appIndex.isCommandEnabled(id)
             }
             KeyShortcut.displayedHyperChord = { [settings] in
-                guard settings.hyperKey != .none else { return nil }
+                // tinycast-space: another app can own the Hyper key and still want the ✦ glyph.
+                guard settings.hyperKey != .none
+                    || UserDefaults.standard.bool(forKey: "spaceHyperGlyphWithoutRemap")
+                else { return nil }
                 return KeyShortcut.hyperChord(includesShift: settings.hyperKeyIncludesShift)
             }
             SystemActionRunner.onAsyncFailure = { [weak self] id, failure in

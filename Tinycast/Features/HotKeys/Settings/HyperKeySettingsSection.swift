@@ -5,6 +5,8 @@ struct HyperKeySettingsSection: View {
     @Environment(AppSettings.self) private var settings
     @State private var diagnostics: HyperKeyDiagnostics?
     @State private var takeover: HyperKeyDiagnostics.Takeover?
+    /// tinycast-space: show ✦ for the Hyper chord while another app does the remapping.
+    @AppStorage("spaceHyperGlyphWithoutRemap") private var hyperGlyphWithoutRemap = false
 
     private var manager: HyperKeyManager { core.hyperKey }
 
@@ -65,11 +67,18 @@ struct HyperKeySettingsSection: View {
                 }
             }
 
+            if settings.hyperKey == .none {
+                Toggle(isOn: $hyperGlyphWithoutRemap) {
+                    SettingsRowTitle(.generalHyperKey, "Show ✦ for another app's Hyper key")
+                    Text("Shortcuts using the whole Hyper chord read as ✦ instead of its modifiers.")
+                }
+            }
+
             Toggle(isOn: $settings.hyperKeyIncludesShift) {
                 SettingsRowTitle(.generalHyperKey, "Include Shift (⇧)")
             }
             // Flipping it re-points recorded chords, so it needs a chord to mean.
-            .settingsEnabled(settings.hyperKey != .none)
+            .settingsEnabled(settings.hyperKey != .none || hyperGlyphWithoutRemap)
 
             if settings.hyperKey.supportsSecureInputCompatibility {
                 Toggle(isOn: $settings.hyperKeySecureInputCompatibility) {
