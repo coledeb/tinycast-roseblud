@@ -158,6 +158,15 @@ enum AppActionsMenu {
                     core.launcherCoordinator.showInFinder(app)
                 })
         }
+        if app.kind == .application {  // tinycast-space
+            items.append(
+                PopoverMenuItem(
+                    title: String(localized: "Show Info in Finder"), systemImage: "info.circle",
+                    shortcut: "⌘I"
+                ) {
+                    core.launcherCoordinator.showInfoInFinder(app)
+                })
+        }
         return items
     }
 }

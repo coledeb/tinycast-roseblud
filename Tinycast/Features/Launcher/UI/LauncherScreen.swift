@@ -351,8 +351,14 @@ struct LauncherScreen: PaletteScreen {
         case .favoriteSlot(let index): return launchFavorite(at: index)
         case .copyCalculation: return copyCalculation(at: selection)
         case .openInApp, .showDetails:
-            guard let meeting = meeting(at: selection) else { return false }
-            return MeetingActionsMenu.perform(shortcut, meeting: meeting, core: core)
+            if let meeting = meeting(at: selection) {
+                return MeetingActionsMenu.perform(shortcut, meeting: meeting, core: core)
+            }
+            // tinycast-space: ⌘I on an app opens Finder's Get Info, as in Raycast.
+            guard shortcut == .showDetails, let app = entry(at: selection), app.kind == .application
+            else { return false }
+            core.launcherCoordinator.showInfoInFinder(app)
+            return true
         default: return false
         }
     }
