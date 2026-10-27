@@ -414,6 +414,18 @@ export default async function Command() {
 }
 `;
 
+const oauthQueueSource = `
+import { OAuth } from "@raycast/api";
+
+export default async function Command() {
+  const client = new OAuth.PKCEClient({ redirectMethod: OAuth.RedirectMethod.Web, providerName: "GitHub" });
+  const settle = (promise) => promise.then((value) => ({ value }), (error) => ({ error: error.message }));
+  const first = settle(client.authorize({ url: "https://auth.example.test/first" }));
+  const second = settle(client.authorize({ url: "https://auth.example.test/second" }));
+  globalThis.__oauthQueue = Promise.all([first, second]);
+}
+`;
+
 const formDataSource = `
 export default async function Command() {
   const form = new FormData();
@@ -1268,6 +1280,31 @@ export async function runFixtures() {
           if (tokens === null) oauthTokens.delete(provider);
           else oauthTokens.set(provider, tokens);
           return null;
+        },
+      },
+    },
+  );
+
+  const queuedSignIns = [];
+  let cancelFirst;
+  await run(
+    "concurrent OAuth sign-ins run one after another and a cancelled one settles",
+    oauthQueueSource,
+    "no-view",
+    async (harness) => {
+      check("only the first sign-in opens the browser", queuedSignIns.length === 1, JSON.stringify(queuedSignIns));
+      cancelFirst(new Error("Sign-in was cancelled."));
+      const [first, second] = await harness.call("globalThis.__oauthQueue");
+      check("a cancelled sign-in rejects with the host's error", first?.error?.includes("Sign-in was cancelled."), JSON.stringify(first));
+      check("the next sign-in starts after the failure", queuedSignIns.length === 2 && queuedSignIns[1].endsWith("/second"), JSON.stringify(queuedSignIns));
+      check("the queued sign-in still succeeds", second?.value?.authorizationCode === "code-2", JSON.stringify(second));
+    },
+    {
+      stubs: {
+        "oauth.authorize": ([url]) => {
+          queuedSignIns.push(url);
+          if (queuedSignIns.length === 1) return new Promise((_, reject) => (cancelFirst = reject));
+          return "raycast://oauth?code=code-2";
         },
       },
     },
