@@ -361,6 +361,12 @@ run fallback-test          Tinycast/Features/Launcher/Model/Fallback.swift \
                            Tinycast/Platform/LocalizedResource.swift
 run dictionary-test        Tinycast/Features/Dictionary/Model/DictionaryEntry.swift \
                            Tinycast/Features/Dictionary/Model/DictionaryMarkup.swift
+run dictionary-session-test Tinycast/Features/Dictionary/Model/DictionaryEntry.swift \
+                           Tinycast/Features/Dictionary/Model/DictionaryMarkup.swift \
+                           Tinycast/Features/Dictionary/Model/DictionaryResult.swift \
+                           Tinycast/Features/Dictionary/Service/DictionaryService.swift \
+                           Tinycast/Features/Dictionary/Service/DictionarySuggestionService.swift \
+                           Tinycast/Features/Dictionary/Service/DictionarySession.swift
 run dictation-test         Tinycast/Features/Dictation/Model/DictationModel.swift Tinycast/Features/Dictation/Model/DictationIdleRelease.swift Tinycast/Features/Dictation/Model/DictationLanguage.swift Tinycast/Features/Dictation/Model/DictationTextFormatter.swift
 run dictation-cue-test     Tinycast/Features/Dictation/Service/DictationCueRunner.swift
 run dictation-field-test   Tinycast/Features/Dictation/Model/DictationModel.swift \
