@@ -1704,6 +1704,14 @@ const streamModule = unsupportedModule(
   Object.assign(streamClasses.Stream, {
     ...streamClasses,
     getDefaultHighWaterMark: (objectMode) => (objectMode ? 16 : 16 * 1024),
+    // tinycast-space: Node's state probes, which undici's response body asks before reading.
+    // Read-only questions about a stream's state, nothing to do with sockets.
+    isDisturbed: (s) =>
+      !!(s && (s.disturbed || s.readableDidRead || s.readableAborted
+        || s._readableState?.dataEmitted || s._readableState?.endEmitted)),
+    isErrored: (s) => !!(s && (s.errored || s._readableState?.errored || s._writableState?.errored)),
+    isReadable: (s) =>
+      !!(s && s.readable !== false && !s.destroyed && !s._readableState?.endEmitted),
     pipeline,
     finished,
     promises: { pipeline: (...stages) => pipelinePromise(stages), finished: finishedPromise },
