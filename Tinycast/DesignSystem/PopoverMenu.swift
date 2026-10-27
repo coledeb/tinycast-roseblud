@@ -132,7 +132,7 @@ struct PopoverMenu: View {
             attachedRadius: metrics.size.menuButton / 2)
         surfaceContent
             .frame(width: width ?? metrics.size.actionMenuWidth)
-            .glassEffect(.regular, in: shape)
+            .glassEffect(SpaceTheme.tinted(.regular), in: shape)  // tinycast-space
     }
 
     private var surfaceContent: some View {

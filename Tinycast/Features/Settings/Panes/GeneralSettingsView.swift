@@ -77,6 +77,7 @@ struct GeneralSettingsView: View {
                 } label: {
                     SettingsRowTitle(.generalAppearance, "Appearance")
                 }
+                RaycastThemeRows()  // tinycast-space
                 Toggle(isOn: $settings.animationsEnabled) {
                     SettingsRowTitle(.generalAppearance, "Show animations")
                 }
