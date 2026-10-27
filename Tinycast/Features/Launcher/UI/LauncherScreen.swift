@@ -419,8 +419,16 @@ struct LauncherScreen: PaletteScreen {
         return true
     }
 
-    /// ⌘1–⌘9/⌘0 — launch a favorite by position, in either palette size.
+    /// ⌘1–⌘9/⌘0 — launch a favorite by position, in either palette size. While a query is
+    /// typed no favorite is pinned, so ⌘1–⌘9 open that many results down instead.
     private func launchFavorite(at index: Int) -> Bool {
+        if !pinsFavorites {
+            guard index < LauncherList.numberedResultLimit,
+                let row = rows.indices.filter({ entry(at: $0) != nil }).dropFirst(index).first
+            else { return false }
+            activate(at: row)
+            return true
+        }
         guard pinnedFavorites.indices.contains(index) else { return false }
         activate(at: index + (leadCard == nil ? 0 : 1))
         return true
@@ -527,6 +535,7 @@ struct LauncherScreen: PaletteScreen {
             meetingCount: meetingCount,
             suggestionCount: suggestionCount,
             matchCount: matchCount,
+            numbersResults: !pinsFavorites,
             scroll: scroll,
             card: leadCard,
             cardSelected: isCardSelected(selection),
