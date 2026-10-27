@@ -50,6 +50,10 @@ struct RootPaletteView: View {
     private var screen: any PaletteScreen {
         switch vm.mode {
         case .launcher:
+            // tinycast-space: a leading `?` scopes root search to Tinycast's settings.
+            if SettingsSearchScreen.scope(of: vm.query) != nil {
+                return SettingsSearchScreen(core: core, vm: vm, openActions: openActions)
+            }
             return LauncherScreen(
                 appIndex: appIndex, favorites: favorites, visibility: visibility,
                 currencyRates: currencyRates, core: core, vm: vm, running: selectionIsRunning,

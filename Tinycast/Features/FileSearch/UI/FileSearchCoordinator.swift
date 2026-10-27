@@ -56,7 +56,9 @@ final class FileSearchCoordinator {
 
     /// Borrows the screen's session, so Search Files then opens on the request already answered.
     func searchFromLauncher(_ query: String) {
-        guard showsFilesInLauncher, FileSearchQuery.answersLauncher(query) else {
+        guard showsFilesInLauncher, FileSearchQuery.answersLauncher(query),
+            SettingsSearchScreen.scope(of: query) == nil  // tinycast-space
+        else {
             session.cancel()
             return
         }
