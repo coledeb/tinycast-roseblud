@@ -493,6 +493,8 @@ final class AppCore {
         }
         // tinycast-space: a theme link — ray.so, Raycast's Theme Studio, or the Theme command.
         if SpaceTheme.handle(url, in: self) { return }
+        // tinycast-space: `tinycast://open?id=…`, any launcher entry by its id.
+        if EntryDeepLinkActions.handle(url, in: self) { return }
         guard ExtensionDeepLink.claims(url) else { return }
         guard let route = ExtensionDeepLink.route(url: url) else {
             paletteCoordinator.showPalette(mode: .launcher, restoreAnyMode: true)
