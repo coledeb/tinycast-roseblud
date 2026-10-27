@@ -5,6 +5,8 @@ struct PaletteFrame: Equatable {
     let mode: PaletteMode
     let query: String
     let selection: Int
+    /// tinycast-space: a clipboard screen is left and returned to with its filter.
+    var clipboardFilter: ClipboardFilter = .all
 }
 
 @MainActor
@@ -97,14 +99,23 @@ final class PaletteState {
 
     func push(mode: PaletteMode) {
         if !self.mode.isNativeEditor {
-            backStack.append(PaletteFrame(mode: self.mode, query: query, selection: selection))
+            backStack.append(
+                PaletteFrame(
+                    mode: self.mode, query: query, selection: selection, clipboardFilter: clipboardFilter))
         }
         replace(mode: mode)
+    }
+
+    /// Lands on a row that moved while the screen was away.
+    func restoreSelection(_ index: Int) {
+        selection = index
+        restoredSelection = index
     }
 
     func pop(preservingSelection: Bool = false) -> Bool {
         guard let frame = backStack.popLast() else { return false }
         openScreen(frame.mode)
+        clipboardFilter = frame.clipboardFilter
         query = frame.query
         selection = frame.selection
         restoredSelection = preservingSelection ? frame.selection : nil
@@ -115,7 +126,9 @@ final class PaletteState {
 
     /// Tab's step deeper into the ring: the screen crossed from is the step back, query and all.
     func pushCarryingQuery(mode: PaletteMode) {
-        backStack.append(PaletteFrame(mode: self.mode, query: query, selection: selection))
+        backStack.append(
+            PaletteFrame(
+                mode: self.mode, query: query, selection: selection, clipboardFilter: clipboardFilter))
         self.mode = mode
     }
 

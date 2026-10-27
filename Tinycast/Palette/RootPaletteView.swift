@@ -433,7 +433,8 @@ struct RootPaletteView: View {
                 fileSearch.search(vm.query, filter: vm.fileSearchFilter)
             }
             .onChange(of: vm.mode) {
-                vm.clipboardFilter = .all
+                // tinycast-space: a screen popped back to keeps the filter it was left with.
+                if vm.restoredSelection == nil { vm.clipboardFilter = .all }
                 vm.fileSearchFilter = .all
                 vm.emojiCategoryFilter = .all
                 vm.emojiGridColumnsOverride = nil
