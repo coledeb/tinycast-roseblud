@@ -485,6 +485,11 @@ final class AppCore {
     }
 
     func handleOpenURL(_ url: URL) {
+        // tinycast-space: the link extensions fire when a timer or task finishes.
+        if ConfettiOverlay.claims(url) {
+            if !ConfettiOverlay.fire() { showMessage("🎉") }
+            return
+        }
         guard ExtensionDeepLink.claims(url) else { return }
         guard let route = ExtensionDeepLink.route(url: url) else {
             paletteCoordinator.showPalette(mode: .launcher, restoreAnyMode: true)
