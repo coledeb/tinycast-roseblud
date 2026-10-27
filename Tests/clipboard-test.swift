@@ -283,6 +283,25 @@ struct ClipboardTests {
             expect(
                 store.pinnedItem(at: 0, in: "", filter: .link) == nil,
                 "filter applies before pinned slot mapping")
+
+            expect(
+                (0..<3).allSatisfy {
+                    store.numberedItem(at: $0, in: "", filter: .all)?.id
+                        == store.pinnedItem(at: $0, in: "", filter: .all)?.id
+                },
+                "pinned slots keep their meaning")
+            expect(
+                store.numberedItem(at: 3, in: "", filter: .all)?.text == "plain text",
+                "the first unpinned row carries the numbering on after the pins")
+            expect(
+                store.numberedItem(at: 4, in: "", filter: .all) == nil, "no row, no slot")
+            expect(
+                store.numberedItem(at: 0, in: "plain", filter: .all)?.text == "plain text",
+                "a query numbers the rows it shows")
+            expect(
+                !ClipboardStore.isNumbered(row: 9, pinned: false)
+                    && ClipboardStore.isNumbered(row: 9, pinned: true),
+                "unpinned rows stop at nine; a tenth pin keeps its ⌘0")
         }
     }
 

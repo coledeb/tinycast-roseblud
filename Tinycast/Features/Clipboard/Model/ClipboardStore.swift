@@ -600,6 +600,23 @@ final class ClipboardStore {
         return search(query, filter: filter).prefix(while: \.isPinned).dropFirst(index).first
     }
 
+    /// tinycast-space: ⌘1–⌘9 reach this many rows whether pinned or not; ⌘0 stays for a tenth pin.
+    static let numberedRowLimit = 9
+
+    /// Whether the visible row at `index` answers a ⌘-digit. The Pinned section always leads the
+    /// list, so a pinned slot is its row's index and the rows after it carry on the count.
+    static func isNumbered(row index: Int, pinned: Bool) -> Bool {
+        index >= 0 && (pinned || index < numberedRowLimit)
+    }
+
+    /// The row ⌘ plus slot `index` opens: pinned slots as `pinnedItem`, then unpinned rows in order.
+    func numberedItem(at index: Int, in query: String, filter: ClipboardFilter) -> ClipboardItem? {
+        let rows = search(query, filter: filter)
+        guard rows.indices.contains(index), Self.isNumbered(row: index, pinned: rows[index].isPinned)
+        else { return nil }
+        return rows[index]
+    }
+
     /// Where a reset lands: past the pins to the newest clip, or on the first match once typed.
     func landingIndex(in query: String, filter: ClipboardFilter) -> Int {
         guard query.trimmingCharacters(in: .whitespaces).isEmpty else { return 0 }
