@@ -1,0 +1,152 @@
+name: "Cole · release"
+
+# Every sermelipharo/tinycast-space release (an upstream stable tag + .space/patches) is rebuilt with
+# .cole/patches, signed with this fork's own identity and published here under the same tag.
+on:
+  schedule:
+    - cron: "22,52 * * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "sermelipharo tag to (re)release, e.g. v0.12.1; empty = their latest"
+        type: string
+        required: false
+
+concurrency:
+  group: cole-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  BASE_REPO_NAME: sermelipharo/tinycast-space
+  BASE_REPO: https://github.com/sermelipharo/tinycast-space.git
+  SIGNING_IDENTITY: Tinycast Cole Self-Signed
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          TAG="${INPUT_TAG:-$(gh release view -R "$BASE_REPO_NAME" --json tagName -q .tagName)}"
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "not a stable tag: $TAG"; exit 1; }
+          HEAD=$(gh api "repos/$REPO/commits/main" -q .sha)
+          if [ -z "$INPUT_TAG" ] && gh release view "$TAG" -R "$REPO" > /dev/null 2>&1; then TAG=""; fi
+          if [ -n "$TAG" ] && [ -z "$INPUT_TAG" ] && gh issue list --label cole-release --state open \
+               --json title -q '.[].title' | grep -qxF "Release blocked: $TAG + main ${HEAD:0:7}"; then TAG=""; fi
+          echo "tag=$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: check
+    if: needs.check.outputs.tag != ''
+    runs-on: xcode-27
+    timeout-minutes: 120
+    env:
+      TAG: ${{ needs.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.COLE_PUSH_TOKEN }}
+
+      - name: Select Xcode 27
+        run: |
+          XCODE_PATH="$(find -E /Applications -maxdepth 1 -type d -regex '.*/Xcode_27(\.[0-9]+)*\.app' | sort -V | tail -n1)"
+          [ -n "$XCODE_PATH" ] || { ls /Applications | grep -i xcode; exit 1; }
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Apply the patches to sermelipharo's tag
+        run: |
+          git config user.name "coledeb"
+          git config user.email "27379200+coledeb@users.noreply.github.com"
+          git fetch --no-tags "$BASE_REPO" "refs/tags/$TAG"
+          BASE=$(git rev-parse "FETCH_HEAD^{commit}")
+          .cole/rebuild.sh "$BASE" "tinycast-cole: ${TAG#v} (space ${BASE:0:7})"
+          { echo "BASE=$BASE"; echo "VERSION=${TAG#v}"; } >> "$GITHUB_ENV"
+
+      - name: Build and test
+        run: .space/gate.sh "$BASE"
+
+      - name: Import signing certificate
+        env:
+          P12_BASE64: ${{ secrets.SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KPW="$(openssl rand -base64 24)"
+          echo "${P12_BASE64}" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KPW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KPW" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "${P12_PASSWORD}" -A -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KPW" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/"//g')
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Build signed app
+        run: |
+          xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp=none" \
+            PRODUCT_NAME="Tinycast" TINYCAST_BUNDLE_IDENTIFIER="com.tinycast.app" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            build
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app"
+          ./Scripts/verify-signature.sh "$APP"
+          codesign -dvvv "$APP" 2>&1 | grep -qx "Authority=$SIGNING_IDENTITY"
+
+      - name: Package DMG and ZIP
+        run: |
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app"
+          STAGE="$(mktemp -d)"
+          cp -R "$APP" "$STAGE/"
+          ln -s /Applications "$STAGE/Applications"
+          mkdir -p dist
+          diskutil image create from "$STAGE" --format UDZO --volumeName "Tinycast" "dist/Tinycast-$VERSION.dmg"
+          ditto -c -k --keepParent --sequesterRsrc "$APP" "dist/Tinycast-$VERSION.zip"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # sermelipharo's notes (upstream's changelog, already linked), cut at the install marker.
+          gh release view "$TAG" -R "$BASE_REPO_NAME" --json body -q .body \
+            | sed '/<!-- tinycast:install -->/,$d' > "$RUNNER_TEMP/base.md"
+          {
+            echo "[Tinycast $VERSION · Space Edition](https://github.com/$BASE_REPO_NAME/releases/tag/$TAG) rebuilt with this fork's [\`.cole/patches\`](https://github.com/$GITHUB_REPOSITORY/tree/main/.cole/patches)."
+            echo
+            cat "$RUNNER_TEMP/base.md"
+            echo
+            echo "<!-- tinycast:install -->"
+            echo "Download \`Tinycast-$VERSION.dmg\`, drag Tinycast to Applications, then run \`xattr -dr com.apple.quarantine /Applications/Tinycast.app\` once — the build is self-signed. Installed copies update themselves from this repository."
+          } > "$RUNNER_TEMP/notes.md"
+          git tag -f "$TAG"
+          git push -f origin "refs/tags/$TAG"
+          gh release delete "$TAG" -y > /dev/null 2>&1 || true
+          gh release create "$TAG" "dist/Tinycast-$VERSION.dmg" "dist/Tinycast-$VERSION.zip" \
+            --verify-tag --latest --title "Tinycast $VERSION · Cole Edition" --notes-file "$RUNNER_TEMP/notes.md"
+
+      - name: Close blocked issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .cole/report.sh close release
+
+      - name: Report blocked release
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          .cole/report.sh open release "Release blocked: $TAG + main $(git rev-parse --short=7 origin/main)"

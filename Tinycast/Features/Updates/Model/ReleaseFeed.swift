@@ -13,7 +13,7 @@ struct AvailableRelease: Codable, Hashable, Sendable {
 enum ReleaseFeed {
     /// Where releases come from, and what every `@handle` and `#304` in their notes points at.
     // tinycast-space: this build updates from the fork, never from upstream.
-    static let repository = "sermelipharo/tinycast-space"
+    static let repository = "coledeb/tinycast-space"
 
     /// The only artifact with an x86_64 slice, so the only one an Intel Mac can install.
     private static let universalMarker = "-Universal-"
