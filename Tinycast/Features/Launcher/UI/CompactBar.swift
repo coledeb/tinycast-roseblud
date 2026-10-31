@@ -56,7 +56,7 @@ struct CompactBar: View {
                 capsule.fill(.clear)
                     .frame(width: geometry.capsuleWidth(revealed: revealed))
                     .frame(maxHeight: .infinity)
-                    .glassEffect(.regular, in: capsule)
+                    .glassEffect(.regular.tint(CompactBarScrim.current.tint), in: capsule)
                     .animation(
                         reduceMotion ? nil : BarMotion.capsule.delay(BarMotion.revealDelay),
                         value: revealed)
@@ -97,7 +97,7 @@ struct CompactBar: View {
                 colorScheme == .dark && selection == command && revealed ? 1 : 0),
             in: .circle
         )
-        .glassEffect(.regular.interactive(), in: .circle)
+        .glassEffect(CompactBarScrim.buttonGlass(isWashed: colorScheme == .dark && selection == command), in: .circle)
         .overlay {
             if colorScheme == .dark {
                 Circle().fill(selection == command ? Theme.Colors.compactShortcutGlassSelection : .clear)
@@ -110,7 +110,7 @@ struct CompactBar: View {
     }
 
     private func scrim(geometry: CompactBarGeometry, revealed: Bool) -> some View {
-        Theme.Colors.panelScrim
+        CompactBarScrim.current.cover
             .mask {
                 ZStack(alignment: .topLeading) {
                     Capsule().fill(.white)
