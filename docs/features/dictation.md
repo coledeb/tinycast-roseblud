@@ -151,3 +151,30 @@ Use the same audio, build configuration and otherwise idle machine for compariso
 Optional arguments select a helper `.app`, model directory and one model's raw identifier instead of
 all four. This tool is outside the deterministic suite and app targets; it neither downloads models
 nor adds bundled resources.
+
+## Apple recognizer and live transcript (tinycast-roseblud)
+
+Settings → Dictation → Recognizer picks *Apple SpeechAnalyzer* (`SpeechTranscriber` through
+`SpeechAnalyzer`) instead of the downloaded models; the Model section is then disabled.
+
+- It runs in the app, not the helper: the analyzer is a system service, and the helper's pipe is one
+  request, one result. Nothing is downloaded by Tinycast; *Install* asks `AssetInventory` for the
+  system language's assets, which macOS manages. The locale follows the system language.
+- `DictationCapture.onSamples` hands every accepted sample to the recognizer on the capture queue.
+  An `AsyncStream` holds samples until the analyzer reports its format; conversion runs off-main.
+  Without Apple selected, the tap is nil.
+- The engine is read when a session begins. The token, cues, ducking, the five-minute limit,
+  Return/Escape and delivery are the chunked path's; finishing ends the input, waits for every pending
+  result to settle, then delivers what live insertion has not.
+- Live insertion pastes only finalized results. Volatile text is shown, never pasted.
+- *Show live transcript* (on by default) draws the last three lines above the capsule in a separate
+  nonactivating panel that never becomes key, so Return and Escape still reach the capsule. Settled
+  text is primary, volatile text secondary. The bubble and its toggle exist only with Apple
+  SpeechAnalyzer; Parakeet and Qwen show no live text, though Insert while recording still pastes
+  their chunks.
+- Both preferences are plain `UserDefaults` keys (`rosebludDictationEngine`, `rosebludDictationLiveTranscript`),
+  as the fork's patches keep them, so they are outside `settings.json` and backups.
+
+`dictation-transcript-test` checks settled and volatile assembly, delivery bookkeeping and the
+bubble's word-boundary tail. `dictation-field-test` stubs `DictationStreaming`, so its sessions stay
+on the chunked path.

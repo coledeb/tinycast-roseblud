@@ -369,6 +369,7 @@ run dictionary-session-test Tinycast/Features/Dictionary/Model/DictionaryEntry.s
                            Tinycast/Features/Dictionary/Service/DictionarySession.swift
 run dictation-test         Tinycast/Features/Dictation/Model/DictationModel.swift Tinycast/Features/Dictation/Model/DictationIdleRelease.swift Tinycast/Features/Dictation/Model/DictationLanguage.swift Tinycast/Features/Dictation/Model/DictationTextFormatter.swift
 run dictation-cue-test     Tinycast/Features/Dictation/Service/DictationCueRunner.swift
+run dictation-transcript-test Tinycast/Features/Dictation/Model/DictationTranscript.swift
 run dictation-field-test   Tinycast/Features/Dictation/Model/DictationModel.swift \
                            Tinycast/Features/Dictation/Model/DictationAudioChunks.swift \
                            Tinycast/Features/Dictation/Model/DictationMode.swift \
