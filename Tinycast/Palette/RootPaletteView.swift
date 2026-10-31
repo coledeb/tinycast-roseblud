@@ -217,7 +217,7 @@ struct RootPaletteView: View {
                     title: String(localized: "Changelog"),
                     systemImage: "clock.arrow.trianglehead.2.counterclockwise.rotate.90"
                 ) {
-                    if let url = URL(string: "https://github.com/sermelipharo/tinycast-space/releases") {
+                    if let url = URL(string: "https://github.com/coledeb/tinycast-roseblud/releases") {
                         openURL(url)
                     }
                 },
@@ -943,7 +943,7 @@ struct RootPaletteView: View {
                 if vm.query.isEmpty, !vm.isComposing {
                     Text(searchPrompt)
                         .font(metrics.typography.searchField)
-                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .foregroundStyle(Theme.Colors.textSecondary)
                         .lineLimit(1)
                         // Never a click target: tapping the placeholder must still land the caret.
                         .allowsHitTesting(false)

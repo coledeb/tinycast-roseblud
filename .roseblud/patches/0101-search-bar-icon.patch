@@ -1,0 +1,369 @@
+diff --git a/Scripts/run-tests.sh b/Scripts/run-tests.sh
+index 9af25c90decc97760b9c6920104d810b91fdcd17..feec08e5f6c42be6b15dca243c974b551934e770 100755
+--- a/Scripts/run-tests.sh
++++ b/Scripts/run-tests.sh
+@@ -370,6 +370,7 @@ run dictionary-session-test Tinycast/Features/Dictionary/Model/DictionaryEntry.s
+ run dictation-test         Tinycast/Features/Dictation/Model/DictationModel.swift Tinycast/Features/Dictation/Model/DictationIdleRelease.swift Tinycast/Features/Dictation/Model/DictationLanguage.swift Tinycast/Features/Dictation/Model/DictationTextFormatter.swift
+ run dictation-cue-test     Tinycast/Features/Dictation/Service/DictationCueRunner.swift
+ run dictation-transcript-test Tinycast/Features/Dictation/Model/DictationTranscript.swift
++run search-bar-icon-test   Tinycast/Features/Launcher/Model/SearchBarIcon.swift
+ run dictation-field-test   Tinycast/Features/Dictation/Model/DictationModel.swift \
+                            Tinycast/Features/Dictation/Model/DictationAudioChunks.swift \
+                            Tinycast/Features/Dictation/Model/DictationMode.swift \
+diff --git a/Tests/search-bar-icon-test.swift b/Tests/search-bar-icon-test.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..63f6a393f7828bde15003f181335c05be34c2648
+--- /dev/null
++++ b/Tests/search-bar-icon-test.swift
+@@ -0,0 +1,28 @@
++import Foundation
++
++@main
++struct SearchBarIconTest {
++    static func main() {
++        func check<T: Equatable>(_ actual: T, _ expected: T, _ label: String) {
++            guard actual == expected else {
++                print("\(label): expected \(String(describing: expected)), got \(String(describing: actual))")
++                exit(1)
++            }
++        }
++
++        check(SearchBarIcon.emoji(in: "🚀"), "🚀", "a lone emoji is kept")
++        check(SearchBarIcon.emoji(in: "😀🚀"), "🚀", "a new pick replaces the old one")
++        check(SearchBarIcon.emoji(in: "🚀a"), "🚀", "letters typed after it are ignored")
++        check(SearchBarIcon.emoji(in: "abc"), nil, "plain text is no emoji")
++        check(SearchBarIcon.emoji(in: ""), nil, "nothing is no emoji")
++        check(SearchBarIcon.emoji(in: "1"), nil, "a digit is no emoji")
++        check(SearchBarIcon.emoji(in: "©"), nil, "a text-style symbol is no emoji")
++        check(SearchBarIcon.emoji(in: "❤️"), "❤️", "a variation selector makes one")
++        check(SearchBarIcon.emoji(in: "👍🏽"), "👍🏽", "a skin tone stays with its emoji")
++        check(SearchBarIcon.emoji(in: "👩‍💻"), "👩‍💻", "a ZWJ sequence is one emoji")
++        check(SearchBarIcon.emoji(in: "🇫🇷"), "🇫🇷", "a flag is one emoji")
++        check(SearchBarIcon.emoji(in: "1️⃣"), "1️⃣", "a keycap is one emoji")
++        check(SearchBarIcon.emoji(in: SearchBarIcon.defaultEmoji), SearchBarIcon.defaultEmoji, "the default is one")
++        print("search bar icon tests passed")
++    }
++}
+diff --git a/Tinycast/Features/Launcher/Model/SearchBarIcon.swift b/Tinycast/Features/Launcher/Model/SearchBarIcon.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..a96ff4851ece5923032e3c71a931b21efe31da43
+--- /dev/null
++++ b/Tinycast/Features/Launcher/Model/SearchBarIcon.swift
+@@ -0,0 +1,23 @@
++import Foundation
++
++/// tinycast-roseblud: what the launcher's search bar shows at its left, before the query.
++enum SearchBarIcon: String, CaseIterable, Sendable {
++    case magnifier
++    case emoji
++
++    static let styleKey = "rosebludSearchBarIcon"
++    static let emojiKey = "rosebludSearchBarEmoji"
++    static let defaultEmoji = "😀"
++
++    /// The last emoji in `text`, so a new pick typed after the old one replaces it.
++    static func emoji(in text: String) -> String? {
++        text.last(where: isEmoji).map(String.init)
++    }
++
++    /// A lone scalar like `©` or `1` is only an emoji with presentation; a sequence is one outright.
++    private static func isEmoji(_ character: Character) -> Bool {
++        let scalars = character.unicodeScalars
++        guard let first = scalars.first, first.properties.isEmoji else { return false }
++        return first.properties.isEmojiPresentation || scalars.count > 1
++    }
++}
+diff --git a/Tinycast/Features/Launcher/UI/CompactBarRevealFade.swift b/Tinycast/Features/Launcher/UI/CompactBarRevealFade.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..eca9632f9ce2e59e16e1fd7c430754ca3f9787a4
+--- /dev/null
++++ b/Tinycast/Features/Launcher/UI/CompactBarRevealFade.swift
+@@ -0,0 +1,36 @@
++import SwiftUI
++
++private typealias BarMotion = Theme.CompactBarMotion
++
++/// tinycast-roseblud: fades in with the compact bar's first glyph, once the capsule has settled.
++struct CompactBarRevealFade: ViewModifier {
++    let isActive: Bool
++    @Environment(PaletteState.self) private var palette
++    @Environment(\.accessibilityReduceMotion) private var reduceMotion
++    @State private var isRevealed = false
++
++    func body(content: Content) -> some View {
++        let shown = !isActive || isRevealed
++        content
++            // Only the way in fades; collapsing back from a query must hide it at once.
++            .animation(reduceMotion || !isRevealed ? nil : fade) {
++                $0.opacity(shown ? 1 : 0).blur(radius: shown ? 0 : BarMotion.glyphBlur)
++            }
++            .task(id: palette.isVisible && isActive) { await followBar() }
++    }
++
++    private var fade: Animation {
++        .easeOut(duration: BarMotion.glyphFade).delay(BarMotion.revealDelay + BarMotion.glyphDelay)
++    }
++
++    /// Mirrors `CompactBar`, which remounts and replays its reveal whenever the window collapses.
++    private func followBar() async {
++        if palette.isVisible {
++            withTransaction(\.disablesAnimations, !isActive) { isRevealed = isActive }
++            return
++        }
++        try? await Task.sleep(for: .seconds(Motion.duration(BarMotion.parkAfterHide)))
++        guard !Task.isCancelled else { return }
++        withTransaction(\.disablesAnimations, true) { isRevealed = false }
++    }
++}
+diff --git a/Tinycast/Features/Launcher/UI/LauncherSearchIcon.swift b/Tinycast/Features/Launcher/UI/LauncherSearchIcon.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..d00d33dced24e697e6f8d08249737cb67e82d5f7
+--- /dev/null
++++ b/Tinycast/Features/Launcher/UI/LauncherSearchIcon.swift
+@@ -0,0 +1,24 @@
++import SwiftUI
++
++/// tinycast-roseblud: the launcher's leading icon, its mode symbol or the emoji chosen in Settings.
++struct LauncherSearchIcon: View {
++    let systemImage: String
++    @AppStorage(SearchBarIcon.styleKey) private var style = SearchBarIcon.magnifier
++    @AppStorage(SearchBarIcon.emojiKey) private var emoji = SearchBarIcon.defaultEmoji
++    @Environment(\.metrics) private var metrics
++
++    var body: some View {
++        switch style {
++        case .magnifier:
++            Image(systemName: systemImage)
++                .font(metrics.typography.headerIcon)
++                .symbolRenderingMode(.hierarchical)
++                .foregroundStyle(.secondary)
++        case .emoji:
++            // A hand-edited default could hold anything, and the bar must never show text.
++            Text(verbatim: SearchBarIcon.emoji(in: emoji) ?? SearchBarIcon.defaultEmoji)
++                .font(metrics.typography.headerIcon)
++                .accessibilityHidden(true)
++        }
++    }
++}
+diff --git a/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift b/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift
+index 189bf23c9bd9db6456ed1199edebd32bc40fd238..7b3462695e442fbda5959c4d3b9bb267a823039a 100644
+--- a/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift
++++ b/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift
+@@ -82,6 +82,7 @@ struct GeneralSettingsView: View {
+                     SettingsRowTitle(.generalAppearance, "Show animations")
+                 }
+                 InterfaceSizeRow()
++                SearchBarIconRow()  // tinycast-roseblud
+                 WindowModeRow()
+                     .background {
+                         if !settings.compactMode {
+diff --git a/Tinycast/Features/Settings/Panes/SearchBarEmojiPicker.swift b/Tinycast/Features/Settings/Panes/SearchBarEmojiPicker.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..c16321021cc61156c46ac2caa913c43c3a08872d
+--- /dev/null
++++ b/Tinycast/Features/Settings/Panes/SearchBarEmojiPicker.swift
+@@ -0,0 +1,68 @@
++import SwiftUI
++
++/// tinycast-roseblud: the search bar icon's emoji popover, searched like the Emoji screen.
++struct SearchBarEmojiPicker: View {
++    let onPick: (String) -> Void
++    @Environment(AppCore.self) private var core
++    @Environment(AppSettings.self) private var settings
++    @State private var query = ""
++    @FocusState private var searchFocused: Bool
++
++    private static let columnCount = 8
++    private static let cell: CGFloat = 32
++    private static let height: CGFloat = 300
++
++    private var columns: [GridItem] {
++        Array(repeating: GridItem(.fixed(Self.cell), spacing: Theme.Spacing.sm), count: Self.columnCount)
++    }
++
++    var body: some View {
++        let results = results
++        return VStack(spacing: Theme.Spacing.md) {
++            // The popover inherits the Settings form's style, which right-aligns its fields.
++            TextField("", text: $query, prompt: Text("Search…"))
++                .labelsHidden()
++                .multilineTextAlignment(.leading)
++                .textFieldStyle(.roundedBorder)
++                .focused($searchFocused)
++                .onSubmit { results.first.map(pick) }
++            ScrollView {
++                LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
++                    ForEach(results) { entry in
++                        Button { pick(entry) } label: {
++                            Text(verbatim: glyph(entry))
++                                .font(.system(size: 22))
++                                .frame(width: Self.cell, height: Self.cell)
++                                .contentShape(Rectangle())
++                        }
++                        .buttonStyle(.plain)
++                        .help(entry.displayName)
++                    }
++                }
++            }
++            .overlay {
++                if results.isEmpty { Text("No Results").foregroundStyle(.secondary) }
++            }
++        }
++        .padding(Theme.Spacing.md)
++        .frame(width: width, height: Self.height)
++        .onAppear { searchFocused = true }
++    }
++
++    private var width: CGFloat {
++        CGFloat(Self.columnCount) * (Self.cell + Theme.Spacing.sm) + Theme.Spacing.md * 2
++    }
++
++    /// Symbols and text-style characters share the catalog, but only an emoji may stand in the bar.
++    private var results: [EmojiEntry] {
++        let index = core.emojiIndex
++        let entries =
++            query.isEmpty
++            ? index.categorySections.flatMap(\.entries) : index.search(query, frequent: core.frequentEmoji)
++        return entries.filter { SearchBarIcon.emoji(in: $0.glyph) == $0.glyph }
++    }
++
++    private func glyph(_ entry: EmojiEntry) -> String { entry.display(tone: settings.emojiSkinTone) }
++
++    private func pick(_ entry: EmojiEntry) { onPick(glyph(entry)) }
++}
+diff --git a/Tinycast/Features/Settings/Panes/SearchBarIconRow.swift b/Tinycast/Features/Settings/Panes/SearchBarIconRow.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee7eb0939b8dd7715d19c08d28af699797300f04
+--- /dev/null
++++ b/Tinycast/Features/Settings/Panes/SearchBarIconRow.swift
+@@ -0,0 +1,62 @@
++import SwiftUI
++
++/// tinycast-roseblud: Settings → General → Appearance, the launcher's search bar icon.
++struct SearchBarIconRow: View {
++    @AppStorage(SearchBarIcon.styleKey) private var style = SearchBarIcon.magnifier
++    @AppStorage(SearchBarIcon.emojiKey) private var emoji = SearchBarIcon.defaultEmoji
++    @State private var picking = false
++
++    var body: some View {
++        LabeledContent {
++            HStack(spacing: Theme.Spacing.sm) {
++                SearchBarIconTile(isSelected: style == .magnifier, help: "Search icon") {
++                    style = .magnifier
++                } label: {
++                    Image(systemName: PaletteMode.launcher.systemImage)
++                        .font(Theme.Typography.headerIcon)
++                        .symbolRenderingMode(.hierarchical)
++                        .foregroundStyle(.secondary)
++                }
++                SearchBarIconTile(isSelected: style == .emoji, help: "Choose an emoji") {
++                    style = .emoji
++                    picking = true
++                } label: {
++                    Text(verbatim: shownEmoji).font(Theme.Typography.headerIcon)
++                }
++                .popover(isPresented: $picking, arrowEdge: .bottom) {
++                    SearchBarEmojiPicker { picked in
++                        emoji = picked
++                        picking = false
++                    }
++                }
++            }
++        } label: {
++            SettingsRowTitle(.generalAppearance, "Search bar icon")
++        }
++    }
++
++    private var shownEmoji: String { SearchBarIcon.emoji(in: emoji) ?? SearchBarIcon.defaultEmoji }
++}
++
++/// One choice, drawn at the search bar's own icon size; the chosen one sits on a filled tile.
++private struct SearchBarIconTile<Label: View>: View {
++    let isSelected: Bool
++    let help: LocalizedStringKey
++    let action: () -> Void
++    @ViewBuilder let label: Label
++
++    private static var side: CGFloat { 36 }
++
++    var body: some View {
++        Button(action: action) {
++            label
++                .frame(width: Self.side, height: Self.side)
++                .background(
++                    RoundedRectangle(cornerRadius: Theme.Radius.barControl, style: .continuous)
++                        .fill(isSelected ? Theme.Colors.selection : Color.clear))
++                .contentShape(Rectangle())
++        }
++        .buttonStyle(.plain)
++        .help(help)
++    }
++}
+diff --git a/Tinycast/Features/Settings/SettingsSearchCatalog.swift b/Tinycast/Features/Settings/SettingsSearchCatalog.swift
+index 55aa96a78493968593ca8474e86f42ec63cc6da9..015e029e5ada2b75556955eb9bcf64f4c9cd23ed 100644
+--- a/Tinycast/Features/Settings/SettingsSearchCatalog.swift
++++ b/Tinycast/Features/Settings/SettingsSearchCatalog.swift
+@@ -163,6 +163,8 @@ enum SettingsSearchCatalog {
+         .init(
+             .generalAppearance, "Interface size",
+             keywords: ["text size", "font size", "scale", "zoom", "bigger", "larger", "legible"]),
++        .init(  // tinycast-roseblud
++            .generalAppearance, "Search bar icon", keywords: ["emoji", "magnifier", "glyph"]),
+         .init(
+             .generalAppearance, "Window mode",
+             keywords: ["compact", "expanded", "slim", "search bar", "small"]),
+diff --git a/Tinycast/Palette/RootPaletteView.swift b/Tinycast/Palette/RootPaletteView.swift
+index 2626d7be585b3f41bb11e75bfe79572a61f048fb..24e974fe9316beabd2f11491630086551809fa71 100644
+--- a/Tinycast/Palette/RootPaletteView.swift
++++ b/Tinycast/Palette/RootPaletteView.swift
+@@ -770,10 +770,7 @@ struct RootPaletteView: View {
+             if vm.mode != .launcher {
+                 HeaderBackButton(help: backHelp, action: goBack)
+             } else {
+-                Image(systemName: vm.mode.systemImage)
+-                    .font(metrics.typography.headerIcon)
+-                    .symbolRenderingMode(.hierarchical)
+-                    .foregroundStyle(.secondary)
++                LauncherSearchIcon(systemImage: vm.mode.systemImage)  // tinycast-roseblud
+                     .frame(width: metrics.size.headerIconSlot)
+                     .windowDraggable(settings.paletteDraggable, onBegan: beginDrag, onEnded: endDrag)
+             }
+@@ -789,7 +786,8 @@ struct RootPaletteView: View {
+             }
+             if tabOpensChat {
+                 headerGutter(width: metrics.spacing.md)
+-                quickAITabHint
++                quickAITabHint  // tinycast-roseblud
++                    .modifier(CompactBarRevealFade(isActive: isCollapsed && !compactCommands.isEmpty))
+             }
+             if !isCollapsed, vm.mode == .clipboard {
+                 headerGutter(width: metrics.spacing.md)
+@@ -875,7 +873,8 @@ struct RootPaletteView: View {
+ 
+     /// Resolved through `PaletteTabAction`, so the hint cannot promise the wrong destination.
+     private var tabOpensChat: Bool {
+-        guard !isCollapsed, headerAccessory?.fieldNames.isEmpty ?? true else { return false }
++        // tinycast-roseblud: the compact bar shows it too, since Tab asks Quick AI there as well.
++        guard headerAccessory?.fieldNames.isEmpty ?? true else { return false }
+         return PaletteTabAction.resolve(
+             mode: vm.mode, aiEnabled: settings.aiEnabled,
+             clipboardEnabled: settings.clipboardEnabled) == .ask
+diff --git a/docs/features/palette.md b/docs/features/palette.md
+index 79b65e6530c0042a4488c07df6ee18074e653248..24ffd1860300a8f85afc6e92acded3d2a278afa9 100644
+--- a/docs/features/palette.md
++++ b/docs/features/palette.md
+@@ -172,7 +172,13 @@ pops, a root one closes — so `backHelp` says which, rather than promising a st
+ a close. It lights to `textPrimary` under the pointer over `Theme.Duration.hover`, and
+ `HeaderBackButton` keeps that hover state to itself so the header around it never re-renders.
+ 
+-The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap.
++On the launcher the slot holds `LauncherSearchIcon`: the mode's symbol, or the emoji picked under
++Settings → General → Appearance → *Search bar icon* (`SearchBarIcon`, kept in the plain
++`rosebludSearchBarIcon` / `rosebludSearchBarEmoji` defaults, outside `settings.json` and backups).
++
++The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap, in the
++compact bar as well as the full window. Beside compact shortcuts, `CompactBarRevealFade` holds it back
++until the capsule has settled, then fades it in with the first button's glyph.
+ It is drawn only when Tab really would open Quick AI, a condition read
+ back out of `PaletteTabAction` rather than restated, so a hint can never promise a destination the
+ key does not go to: an argument field to walk takes Tab first, and the hint steps aside for it.

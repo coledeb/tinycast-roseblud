@@ -1,0 +1,856 @@
+diff --git a/Scripts/run-tests.sh b/Scripts/run-tests.sh
+index 793d7fa45583b242b834909f8294ebb84ab07015..9af25c90decc97760b9c6920104d810b91fdcd17 100755
+--- a/Scripts/run-tests.sh
++++ b/Scripts/run-tests.sh
+@@ -369,6 +369,7 @@ run dictionary-session-test Tinycast/Features/Dictionary/Model/DictionaryEntry.s
+                            Tinycast/Features/Dictionary/Service/DictionarySession.swift
+ run dictation-test         Tinycast/Features/Dictation/Model/DictationModel.swift Tinycast/Features/Dictation/Model/DictationIdleRelease.swift Tinycast/Features/Dictation/Model/DictationLanguage.swift Tinycast/Features/Dictation/Model/DictationTextFormatter.swift
+ run dictation-cue-test     Tinycast/Features/Dictation/Service/DictationCueRunner.swift
++run dictation-transcript-test Tinycast/Features/Dictation/Model/DictationTranscript.swift
+ run dictation-field-test   Tinycast/Features/Dictation/Model/DictationModel.swift \
+                            Tinycast/Features/Dictation/Model/DictationAudioChunks.swift \
+                            Tinycast/Features/Dictation/Model/DictationMode.swift \
+diff --git a/Tests/dictation-field-test.swift b/Tests/dictation-field-test.swift
+index 9cdb5c81b9ed84aacfcb0ea58734e4e3abb35add..e0ece8b1232f850e160cf42970707c700d4c0788 100644
+--- a/Tests/dictation-field-test.swift
++++ b/Tests/dictation-field-test.swift
+@@ -522,3 +522,19 @@ enum Paster {
+ }
+ 
+ enum DialogTone { case danger }
++
++// tinycast-roseblud: these sessions take the chunked path, so Apple's recognizer never starts.
++@MainActor
++final class DictationStreaming {
++    static var usesAppleSpeech: Bool { false }
++    var isApple: Bool { false }
++    func begin(
++        apple: Bool, capture: DictationCapture, onResult: @escaping (String, Bool) -> Void,
++        onFailure: @escaping (any Error) -> Void
++    ) {}
++    func apply(_ text: String, isFinal: Bool) {}
++    func takeSettled() -> String { "" }
++    func finish() async {}
++    func closeBubble() {}
++    func end() {}
++}
+diff --git a/Tests/dictation-transcript-test.swift b/Tests/dictation-transcript-test.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..f2a400127403aac928499ba9affb71b83c54eb98
+--- /dev/null
++++ b/Tests/dictation-transcript-test.swift
+@@ -0,0 +1,43 @@
++import Foundation
++
++@main
++struct DictationTranscriptTest {
++    static func main() {
++        func check<T: Equatable>(_ actual: T, _ expected: T, _ label: String) {
++            guard actual == expected else {
++                print("\(label): expected \(expected), got \(actual)")
++                exit(1)
++            }
++        }
++
++        var transcript = DictationTranscript()
++        check(transcript.isEmpty, true, "starts empty")
++        transcript.apply(" Hello", isFinal: false)
++        check(transcript.volatile, "Hello", "a guess is trimmed")
++        check(transcript.undelivered, "", "a guess is never deliverable")
++        transcript.apply("Hello there", isFinal: false)
++        check(transcript.volatile, "Hello there", "a newer guess replaces the last")
++        transcript.apply("Hello there.", isFinal: true)
++        check(transcript.finalized, "Hello there.", "a final result settles")
++        check(transcript.volatile, "", "settling drops the guess")
++        transcript.apply("How", isFinal: false)
++        check(transcript.tail(limit: 100).text, "Hello there. How", "tail joins settled and guess")
++        check(transcript.tail(limit: 100).settled, 12, "settled count stops at the guess")
++
++        check(transcript.takeUndelivered(), "Hello there.", "settled text is taken once")
++        check(transcript.takeUndelivered(), "", "taking again yields nothing")
++        transcript.apply("How are you", isFinal: true)
++        transcript.apply(", friend?", isFinal: true)
++        check(transcript.finalized, "Hello there. How are you, friend?", "punctuation glues without a space")
++        check(transcript.takeUndelivered(), "How are you, friend?", "only the new span is taken")
++
++        var long = DictationTranscript()
++        long.apply("one two three four five six", isFinal: true)
++        long.apply("seven", isFinal: false)
++        let tail = long.tail(limit: 12)
++        check(tail.text, "six seven", "a tail starts at a whole word")
++        check(tail.settled, 3, "the tail's settled count shifts with the cut")
++
++        print("Dictation transcript passed")
++    }
++}
+diff --git a/Tinycast/Features/Dictation/Model/DictationTranscript.swift b/Tinycast/Features/Dictation/Model/DictationTranscript.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..a68e78c911348b76fc2b76027dc6765173252d41
+--- /dev/null
++++ b/Tinycast/Features/Dictation/Model/DictationTranscript.swift
+@@ -0,0 +1,53 @@
++import Foundation
++
++/// The text of one dictation as it streams in: settled text, the recognizer's current guess, and how
++/// much of the settled text has already been delivered.
++struct DictationTranscript: Equatable, Sendable {
++    private(set) var finalized = ""
++    private(set) var volatile = ""
++    private var delivered = 0
++
++    var isEmpty: Bool { finalized.isEmpty && volatile.isEmpty }
++
++    /// Settled text not yet taken, without surrounding whitespace.
++    var undelivered: String {
++        String(finalized.dropFirst(delivered)).trimmingCharacters(in: .whitespacesAndNewlines)
++    }
++
++    /// A final result settles its span and drops the guess it replaces; a volatile one replaces the guess.
++    mutating func apply(_ text: String, isFinal: Bool) {
++        let piece = text.trimmingCharacters(in: .whitespacesAndNewlines)
++        guard isFinal else {
++            volatile = piece
++            return
++        }
++        volatile = ""
++        finalized = Self.joined(finalized, piece)
++    }
++
++    mutating func takeUndelivered() -> String {
++        let text = undelivered
++        delivered = finalized.count
++        return text
++    }
++
++    /// The last `limit` characters of settled and guessed text, cut at a word so the bubble never
++    /// opens mid-word. `settled` counts how many of them are settled.
++    func tail(limit: Int) -> (text: String, settled: Int) {
++        let whole = Self.joined(finalized, volatile)
++        let settled = min(finalized.count, whole.count)
++        guard whole.count > limit else { return (whole, settled) }
++        var start = whole.index(whole.endIndex, offsetBy: -limit)
++        if let space = whole[start...].firstIndex(where: \.isWhitespace) {
++            start = whole.index(after: space)
++        }
++        let dropped = whole.distance(from: whole.startIndex, to: start)
++        return (String(whole[start...]), max(0, settled - dropped))
++    }
++
++    private static func joined(_ head: String, _ next: String) -> String {
++        guard !head.isEmpty, !next.isEmpty else { return head + next }
++        let glued = head.last?.isWhitespace == true || next.first.map { ".,!?;:)]}".contains($0) } == true
++        return glued ? head + next : head + " " + next
++    }
++}
+diff --git a/Tinycast/Features/Dictation/Service/DictationAppleSpeech.swift b/Tinycast/Features/Dictation/Service/DictationAppleSpeech.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..472d9a0b811738f7c7102704fd5a0624b8e99de0
+--- /dev/null
++++ b/Tinycast/Features/Dictation/Service/DictationAppleSpeech.swift
+@@ -0,0 +1,172 @@
++import AVFoundation
++import Speech
++
++/// Apple's on-device recognizer for one dictation: captured samples in, volatile and final text out.
++/// It runs in the app, not the helper: the analyzer is a system service with no model of ours to isolate.
++@MainActor
++final class DictationAppleSpeech {
++    enum Failure: LocalizedError {
++        case unsupportedLocale
++        case notInstalled
++        case audioFormat
++
++        var errorDescription: String? {
++            switch self {
++            case .unsupportedLocale:
++                String(localized: "Apple's speech recognition doesn't support your system language.")
++            case .notInstalled: String(localized: "Install Apple's speech model in Dictation settings first.")
++            case .audioFormat: String(localized: "Couldn't start Apple's speech recognition.")
++            }
++        }
++    }
++
++    static let engineKey = "rosebludDictationEngine"
++    static let liveTranscriptKey = "rosebludDictationLiveTranscript"
++    static var isSelected: Bool { UserDefaults.standard.string(forKey: engineKey) == "apple" }
++    static var showsLiveTranscript: Bool {
++        UserDefaults.standard.object(forKey: liveTranscriptKey) as? Bool ?? true
++    }
++
++    /// Called on the capture queue; the stream holds samples until the analyzer knows its format.
++    nonisolated let sampleTap: @Sendable (UnsafeBufferPointer<Float>) -> Void
++    private let samples: AsyncStream<[Float]>
++    private let sampleSink: AsyncStream<[Float]>.Continuation
++    private var task: Task<Void, Never>?
++    private var analyzer: SpeechAnalyzer?
++
++    init() {
++        let (samples, sink) = AsyncStream.makeStream(of: [Float].self)
++        self.samples = samples
++        sampleSink = sink
++        sampleTap = { sink.yield(Array($0)) }
++    }
++
++    static func locale() async -> Locale? {
++        await SpeechTranscriber.supportedLocale(equivalentTo: .current)
++    }
++
++    static func isInstalled() async -> Bool {
++        guard let locale = await locale() else { return false }
++        let wanted = locale.identifier(.bcp47)
++        return await SpeechTranscriber.installedLocales.contains { $0.identifier(.bcp47) == wanted }
++    }
++
++    static func install() async throws {
++        guard let locale = await locale() else { throw Failure.unsupportedLocale }
++        let module = SpeechTranscriber(locale: locale, preset: .transcription)
++        try await AssetInventory.assetInstallationRequest(supporting: [module])?.downloadAndInstall()
++    }
++
++    /// `onResult` receives each result in order; a final one settles its span of audio.
++    func start(
++        onResult: @escaping (_ text: String, _ isFinal: Bool) -> Void,
++        onFailure: @escaping (any Error) -> Void
++    ) {
++        let samples = samples
++        task = Task { [weak self] in
++            do {
++                guard let locale = await Self.locale() else { throw Failure.unsupportedLocale }
++                guard await Self.isInstalled() else { throw Failure.notInstalled }
++                let transcriber = SpeechTranscriber(
++                    locale: locale, transcriptionOptions: [],
++                    reportingOptions: [.volatileResults, .fastResults], attributeOptions: [])
++                guard
++                    let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
++                else { throw Failure.audioFormat }
++                let analyzer = SpeechAnalyzer(modules: [transcriber])
++                guard let self, !Task.isCancelled else { return }
++                self.analyzer = analyzer
++                try await analyzer.prepareToAnalyze(in: format)
++                let (inputs, inputSink) = AsyncStream.makeStream(of: AnalyzerInput.self)
++                try await analyzer.start(inputSequence: inputs)
++                async let fed: Void = Self.feed(samples, into: inputSink, format: format, analyzer: analyzer)
++                for try await result in transcriber.results {
++                    onResult(String(result.text.characters), result.isFinal)
++                }
++                try await fed
++            } catch {
++                guard !Task.isCancelled, !(error is CancellationError) else { return }
++                onFailure(error)
++            }
++        }
++    }
++
++    /// Ends the input and waits for the analyzer to settle every result still pending.
++    func finish() async {
++        sampleSink.finish()
++        await task?.value
++    }
++
++    func cancel() {
++        sampleSink.finish()
++        task?.cancel()
++        task = nil
++        guard let analyzer else { return }
++        self.analyzer = nil
++        Task { await analyzer.cancelAndFinishNow() }
++    }
++
++    @concurrent
++    private static func feed(
++        _ samples: AsyncStream<[Float]>, into sink: AsyncStream<AnalyzerInput>.Continuation,
++        format: AVAudioFormat, analyzer: SpeechAnalyzer
++    ) async throws {
++        guard
++            let source = AVAudioFormat(
++                commonFormat: .pcmFormatFloat32, sampleRate: Double(DictationWire.sampleRate),
++                channels: 1, interleaved: false)
++        else { throw Failure.audioFormat }
++        let converter = source == format ? nil : AVAudioConverter(from: source, to: format)
++        for await chunk in samples {
++            guard let buffer = pcmBuffer(chunk, format: source) else { continue }
++            guard let converter else {
++                sink.yield(AnalyzerInput(buffer: buffer))
++                continue
++            }
++            if let converted = convert(buffer, with: converter) { sink.yield(AnalyzerInput(buffer: converted)) }
++        }
++        sink.finish()
++        try await analyzer.finalizeAndFinishThroughEndOfInput()
++    }
++
++    private nonisolated static func pcmBuffer(_ samples: [Float], format: AVAudioFormat) -> AVAudioPCMBuffer? {
++        guard !samples.isEmpty,
++            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)),
++            let channel = buffer.floatChannelData?[0]
++        else { return nil }
++        samples.withUnsafeBufferPointer { channel.update(from: $0.baseAddress!, count: samples.count) }
++        buffer.frameLength = AVAudioFrameCount(samples.count)
++        return buffer
++    }
++
++    private nonisolated static func convert(
++        _ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter
++    ) -> AVAudioPCMBuffer? {
++        let ratio = converter.outputFormat.sampleRate / converter.inputFormat.sampleRate
++        let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 1
++        guard let output = AVAudioPCMBuffer(pcmFormat: converter.outputFormat, frameCapacity: capacity)
++        else { return nil }
++        let input = OneShotInput(buffer)
++        var error: NSError?
++        let status = converter.convert(to: output, error: &error) { _, outStatus in input.next(outStatus) }
++        guard status != .error, output.frameLength > 0 else { return nil }
++        return output
++    }
++}
++
++/// Hands the converter one buffer, then reports no data until the next call, so it keeps its state.
++private final class OneShotInput: @unchecked Sendable {
++    private var buffer: AVAudioPCMBuffer?
++
++    init(_ buffer: AVAudioPCMBuffer) { self.buffer = buffer }
++
++    func next(_ status: UnsafeMutablePointer<AVAudioConverterInputStatus>) -> AVAudioBuffer? {
++        guard let buffer else {
++            status.pointee = .noDataNow
++            return nil
++        }
++        self.buffer = nil
++        status.pointee = .haveData
++        return buffer
++    }
++}
+diff --git a/Tinycast/Features/Dictation/Service/DictationCapture.swift b/Tinycast/Features/Dictation/Service/DictationCapture.swift
+index 9930f2aa2bdd1e7e91dd09d227070584038798d2..3e91447fbe7424ab00325441576757afc0f74099 100644
+--- a/Tinycast/Features/Dictation/Service/DictationCapture.swift
++++ b/Tinycast/Features/Dictation/Service/DictationCapture.swift
+@@ -27,6 +27,8 @@ final class DictationCapture {
+ 
+     var onLevels: (([Float]) -> Void)?
+     var onLimit: (() -> Void)?
++    /// tinycast-roseblud: every accepted sample, on the capture queue, for a streaming recognizer.
++    var onSamples: (@Sendable (UnsafeBufferPointer<Float>) -> Void)?
+ 
+     private(set) var isBluetooth = false
+     private var session: AVCaptureSession?
+@@ -73,7 +75,7 @@ final class DictationCapture {
+             },
+             onLimit: { [weak self] in
+                 Task { @MainActor [weak self] in self?.onLimit?() }
+-            })
++            }, onSamples: onSamples)
+         output.setSampleBufferDelegate(collector, queue: collector.queue)
+         self.session = capture
+         self.output = output
+@@ -123,12 +125,17 @@ private final class AudioCollector: NSObject, AVCaptureAudioDataOutputSampleBuff
+     private var reachedLimit = false
+     private let onLevels: @Sendable ([Float]) -> Void
+     private let onLimit: @Sendable () -> Void
++    private let onSamples: (@Sendable (UnsafeBufferPointer<Float>) -> Void)?
+ 
+-    init(onLevels: @escaping @Sendable ([Float]) -> Void, onLimit: @escaping @Sendable () -> Void) throws {
++    init(
++        onLevels: @escaping @Sendable ([Float]) -> Void, onLimit: @escaping @Sendable () -> Void,
++        onSamples: (@Sendable (UnsafeBufferPointer<Float>) -> Void)? = nil
++    ) throws {
+         spectrum = try DictationSpectrum()
+         displayedLevels = [Float](repeating: 0, count: DictationSpectrum.barCount)
+         self.onLevels = onLevels
+         self.onLimit = onLimit
++        self.onSamples = onSamples
+     }
+ 
+     func captureOutput(
+@@ -151,6 +158,7 @@ private final class AudioCollector: NSObject, AVCaptureAudioDataOutputSampleBuff
+         let floats = data.assumingMemoryBound(to: Float.self)
+         let accepted = min(count, DictationWire.maximumSamples - samples.count)
+         samples.append(contentsOf: UnsafeBufferPointer(start: floats, count: accepted))
++        onSamples?(UnsafeBufferPointer(start: floats, count: accepted))
+         if samples.count == DictationWire.maximumSamples, !reachedLimit {
+             reachedLimit = true
+             onLimit()
+diff --git a/Tinycast/Features/Dictation/Service/DictationCoordinator.swift b/Tinycast/Features/Dictation/Service/DictationCoordinator.swift
+index ee7dfaf33967257c17e6f9a10084a79184c7af6c..c44438738f03423e9557db56c5b8ddaaa1e59dd4 100644
+--- a/Tinycast/Features/Dictation/Service/DictationCoordinator.swift
++++ b/Tinycast/Features/Dictation/Service/DictationCoordinator.swift
+@@ -30,6 +30,7 @@ final class DictationCoordinator {
+     @ObservationIgnored private var pendingStartCue: UUID?
+     @ObservationIgnored private var finishWhenStarted = false
+     @ObservationIgnored private var target: InjectionTarget?
++    @ObservationIgnored private let streaming = DictationStreaming()
+     /// The field a mic button is dictating into; nil for a shortcut's session.
+     private(set) var field: DictationField?
+ 
+@@ -122,7 +123,7 @@ final class DictationCoordinator {
+     }
+ 
+     var isEnabled: Bool { settings.dictationEnabled }
+-    var hasModel: Bool { models.isInstalled(settings.dictationModel) }
++    var hasModel: Bool { usesAppleSpeech || models.isInstalled(settings.dictationModel) }
+ 
+     /// A field's own mic: click to start and click to finish, whatever the shortcut's mode or focus.
+     func toggle(into editor: any InjectableTextView) {
+@@ -144,7 +145,7 @@ final class DictationCoordinator {
+     }
+ 
+     private func begin(target: InjectionTarget?) {
+-        guard models.isInstalled(settings.dictationModel) else {
++        guard usesAppleSpeech || models.isInstalled(settings.dictationModel) else {
+             field = nil
+             showMessage(String(localized: "Download the dictation model in Settings first"), .danger)
+             return
+@@ -156,6 +157,7 @@ final class DictationCoordinator {
+         liveOffset = 0
+         liveText = ""
+         self.target = target
++        beginStreaming(token: current)
+         pendingStartCue = settings.dictationPlaysSounds ? current : nil
+         if pendingStartCue == nil { audioDucker.begin() }
+         startTask = Task { [weak self] in
+@@ -210,6 +212,7 @@ final class DictationCoordinator {
+         } else {
+             audioDucker.end()
+         }
++        if streaming.isApple { return acceptStreamed() }
+         // A cancelled chunk keeps its audio: the final pass starts at liveOffset, losing nothing.
+         let pendingLive = liveTask
+         liveTask = nil
+@@ -306,7 +309,7 @@ final class DictationCoordinator {
+     }
+ 
+     private func startLiveInsertion(token current: UUID) {
+-        guard insertionPastes, settings.dictationLiveInsertion else { return }
++        guard !streaming.isApple, insertionPastes, settings.dictationLiveInsertion else { return }
+         liveTask = Task { [weak self] in
+             guard let self else { return }
+             while !Task.isCancelled {
+@@ -405,6 +408,7 @@ final class DictationCoordinator {
+         target = nil
+         field = nil
+         panel.close()
++        streaming.end()
+         audioDucker.end()
+     }
+ }
+@@ -414,3 +418,100 @@ struct DictationField: Equatable {
+     let editor: ObjectIdentifier
+     var isTranscribing = false
+ }
++
++// tinycast-roseblud: Apple's streaming recognizer and the live transcript bubble.
++extension DictationCoordinator {
++    /// Read when a session begins, so changing the engine mid-dictation never splits one.
++    var usesAppleSpeech: Bool { DictationStreaming.usesAppleSpeech }
++
++    fileprivate func beginStreaming(token current: UUID) {
++        streaming.begin(
++            apple: usesAppleSpeech, capture: capture,
++            onResult: { [weak self] text, isFinal in
++                self?.appleSpeechResult(text, isFinal: isFinal, token: current)
++            },
++            onFailure: { [weak self] error in
++                guard let self, token == current else { return }
++                cancel()
++                showMessage(error.localizedDescription, .danger)
++            })
++    }
++
++    private func appleSpeechResult(_ text: String, isFinal: Bool, token current: UUID) {
++        guard token == current, phase != .idle, phase != .stopping else { return }
++        streaming.apply(text, isFinal: isFinal)
++        // Only settled text is pasted: a pasted guess could never be taken back out of another app.
++        guard isFinal, phase == .listening, insertionPastes, settings.dictationLiveInsertion else { return }
++        let settled = streaming.takeSettled()
++        let text = DictationTextFormatter.format(
++            settled, context: insertionContext(), adaptCapitalization: settings.dictationAdaptsCapitalization)
++        guard !text.isEmpty else { return }
++        liveText += text
++        injector.deliver(
++            InjectedText(text), target: target, expectedKeyword: nil,
++            keywordLength: 0, automaticGeneration: nil,
++            isValid: { [weak self] in self?.token == current },
++            onDelivered: {},
++            onFailed: { [weak self] in
++                guard let self, token == current else { return }
++                liveDeliveryFailed = true
++            })
++    }
++
++    fileprivate func acceptStreamed() {
++        let current = token
++        transcriptionTask = Task { [weak self] in
++            guard let self else { return }
++            _ = await capture.stop()
++            await streaming.finish()
++            if !liveText.isEmpty { await injector.drain() }
++            guard token == current else { return }
++            let destination = field == nil ? settings.dictationDestination : .paste
++            let remainder = streaming.takeSettled()
++            guard !remainder.isEmpty else {
++                if liveText.isEmpty {
++                    reset(cancelTranscription: false)
++                    showMessage(String(localized: "No speech was recorded"), .danger)
++                } else {
++                    finishWithoutRemainder(destination)
++                }
++                return
++            }
++            let context = destination.pastes ? insertionContext() : nil
++            let text = DictationTextFormatter.format(
++                remainder, context: context, adaptCapitalization: settings.dictationAdaptsCapitalization)
++            deliverFinal(text, destination: destination, token: current)
++        }
++    }
++
++    /// The same delivery as `accept()`'s, for text that needs no final transcription pass.
++    private func deliverFinal(_ text: String, destination: DictationDestination, token current: UUID) {
++        let assembled = liveText + text
++        panel.close()
++        streaming.closeBubble()
++        guard destination.pastes else {
++            Paster.copyPlainText(text)
++            reset(cancelTranscription: false)
++            return
++        }
++        injector.deliver(
++            InjectedText(text), target: target, expectedKeyword: nil,
++            keywordLength: 0, automaticGeneration: nil,
++            isValid: { [weak self] in self?.token == current },
++            onDelivered: { [weak self] in
++                guard let self, token == current else { return }
++                let lost = liveDeliveryFailed
++                if destination.copies { Paster.copyPlainText(assembled) }
++                reset(cancelTranscription: false)
++                if lost {
++                    showMessage(String(localized: "Couldn't paste some dictation into this app"), .danger)
++                }
++            },
++            onFailed: { [weak self] in
++                guard let self, token == current else { return }
++                reset(cancelTranscription: false)
++                if destination.copies { Paster.copyPlainText(assembled) }
++                showMessage(String(localized: "Couldn't paste dictation into this app"), .danger)
++            })
++    }
++}
+diff --git a/Tinycast/Features/Dictation/Service/DictationStreaming.swift b/Tinycast/Features/Dictation/Service/DictationStreaming.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..ccf02274152a3b73786f54f0636aa55dfaa3f612
+--- /dev/null
++++ b/Tinycast/Features/Dictation/Service/DictationStreaming.swift
+@@ -0,0 +1,53 @@
++import Foundation
++
++/// One dictation's streamed text, Apple's recognizer when it is the engine, and the bubble showing both.
++@MainActor
++final class DictationStreaming {
++    static var usesAppleSpeech: Bool { DictationAppleSpeech.isSelected }
++
++    private let bubble = DictationTranscriptBubble()
++    private var transcript = DictationTranscript()
++    private var apple: DictationAppleSpeech?
++
++    var isApple: Bool { apple != nil }
++
++    /// Without Apple's recognizer the capture keeps no tap, so a chunked session pays nothing for it.
++    func begin(
++        apple useApple: Bool, capture: DictationCapture,
++        onResult: @escaping (_ text: String, _ isFinal: Bool) -> Void,
++        onFailure: @escaping (any Error) -> Void
++    ) {
++        end()
++        guard useApple else {
++            capture.onSamples = nil
++            return
++        }
++        let apple = DictationAppleSpeech()
++        self.apple = apple
++        capture.onSamples = apple.sampleTap
++        apple.start(onResult: onResult, onFailure: onFailure)
++    }
++
++    func apply(_ text: String, isFinal: Bool) {
++        transcript.apply(text, isFinal: isFinal)
++        show()
++    }
++
++    func takeSettled() -> String { transcript.takeUndelivered() }
++
++    func finish() async { await apple?.finish() }
++
++    func closeBubble() { bubble.close() }
++
++    func end() {
++        apple?.cancel()
++        apple = nil
++        transcript = DictationTranscript()
++        bubble.close()
++    }
++
++    private func show() {
++        guard DictationAppleSpeech.showsLiveTranscript else { return }
++        bubble.show(transcript)
++    }
++}
+diff --git a/Tinycast/Features/Dictation/Settings/DictationAppleSpeechSection.swift b/Tinycast/Features/Dictation/Settings/DictationAppleSpeechSection.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..911de722f742d67296c917053763cb388fbdd3d2
+--- /dev/null
++++ b/Tinycast/Features/Dictation/Settings/DictationAppleSpeechSection.swift
+@@ -0,0 +1,83 @@
++import SwiftUI
++
++/// Chooses Apple's on-device recognizer over the downloaded models, and the live transcript bubble.
++struct DictationAppleSpeechSection: View {
++    private enum AssetState { case checking, unsupported, missing, installing, installed }
++
++    @AppStorage(DictationAppleSpeech.engineKey) private var engine = ""
++    @AppStorage(DictationAppleSpeech.liveTranscriptKey) private var showsLiveTranscript = true
++    @State private var assets = AssetState.checking
++    @State private var locale: Locale?
++    @State private var installError: String?
++
++    var body: some View {
++        Section {
++            Picker(selection: $engine) {
++                Text("Downloaded model").tag("")
++                Text("Apple SpeechAnalyzer").tag("apple")
++            } label: {
++                SettingsRowTitle(.dictationModel, "Recognizer")
++                Text(
++                    engine == "apple"
++                        ? "Built into macOS: nothing to download, words appear as you speak."
++                        : "Parakeet or Qwen, chosen below.")
++            }
++            if engine == "apple" {
++                LabeledContent {
++                    switch assets {
++                    case .checking, .installing: ProgressView().controlSize(.small)
++                    case .missing: Button("Install") { install() }
++                    case .unsupported, .installed: EmptyView()
++                    }
++                } label: {
++                    Text(assetTitle)
++                    if let detail = installError ?? locale.map(localeDescription) { Text(detail) }
++                }
++                Toggle(isOn: $showsLiveTranscript) {
++                    SettingsRowTitle(.dictationModel, "Show live transcript")
++                    Text("Words appear above the microphone as you speak.")
++                }
++            }
++        } header: {
++            Text("Recognizer")
++        }
++        .task(id: engine) { await refresh() }
++    }
++
++    private var assetTitle: String {
++        switch assets {
++        case .checking: String(localized: "Checking Apple's speech model…")
++        case .unsupported: String(localized: "Your system language isn't supported")
++        case .missing: String(localized: "Not installed")
++        case .installing: String(localized: "Installing…")
++        case .installed: String(localized: "Installed")
++        }
++    }
++
++    private func localeDescription(_ locale: Locale) -> String {
++        Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier
++    }
++
++    private func refresh() async {
++        guard engine == "apple" else { return }
++        locale = await DictationAppleSpeech.locale()
++        guard locale != nil else {
++            assets = .unsupported
++            return
++        }
++        assets = await DictationAppleSpeech.isInstalled() ? .installed : .missing
++    }
++
++    private func install() {
++        assets = .installing
++        installError = nil
++        Task {
++            do {
++                try await DictationAppleSpeech.install()
++            } catch {
++                installError = error.localizedDescription
++            }
++            await refresh()
++        }
++    }
++}
+diff --git a/Tinycast/Features/Dictation/Settings/DictationSettingsView.swift b/Tinycast/Features/Dictation/Settings/DictationSettingsView.swift
+index 765066cf8537e104556e82d57fcabb1a26123d2e..b0aea2b9bb614777c4bc04019f5616f128513773 100644
+--- a/Tinycast/Features/Dictation/Settings/DictationSettingsView.swift
++++ b/Tinycast/Features/Dictation/Settings/DictationSettingsView.swift
+@@ -8,6 +8,7 @@ struct DictationSettingsView: View {
+     @State private var microphones: [AVCaptureDevice] = []
+     @State private var modelSize: Int64?
+     @State private var microphoneAccess = Permissions.microphoneAccess()
++    @AppStorage(DictationAppleSpeech.engineKey) private var recognizer = ""
+     var body: some View {
+         @Bindable var settings = settings
+         return Form {
+@@ -83,6 +84,8 @@ struct DictationSettingsView: View {
+                     SettingsSectionHeader(.dictationCommands)
+                 }
+ 
++                DictationAppleSpeechSection()
++
+                 Section {
+                     Picker(selection: familyBinding) {
+                         ForEach(DictationModel.Family.allCases) { family in
+@@ -144,6 +147,7 @@ struct DictationSettingsView: View {
+                 } header: {
+                     SettingsSectionHeader(.dictationModel)
+                 }
++                .disabled(recognizer == "apple")
+ 
+                 Section {
+                     Picker(selection: $settings.dictationIdleRelease) {
+diff --git a/Tinycast/Features/Dictation/UI/DictationTranscriptBubble.swift b/Tinycast/Features/Dictation/UI/DictationTranscriptBubble.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b429111e07379b432956c17e1fd7c3557cec937
+--- /dev/null
++++ b/Tinycast/Features/Dictation/UI/DictationTranscriptBubble.swift
+@@ -0,0 +1,103 @@
++import AppKit
++import SwiftUI
++
++@MainActor
++@Observable
++private final class DictationBubbleState {
++    var text = ""
++    var settled = 0
++}
++
++private struct DictationBubbleView: View {
++    let state: DictationBubbleState
++
++    var body: some View {
++        Text(attributed)
++            .font(Theme.Typography.rowTitle)
++            .lineLimit(DictationTranscriptBubble.maximumLines)
++            .truncationMode(.head)
++            .frame(width: DictationTranscriptBubble.textWidth, alignment: .leading)
++            .padding(.horizontal, Theme.Spacing.xl)
++            .padding(.vertical, Theme.Spacing.md)
++            .glassEffect(.regular, in: .rect(cornerRadius: Theme.Radius.dialog))
++            .accessibilityLabel("Dictation transcript")
++            .accessibilityValue(state.text)
++    }
++
++    /// Settled words read as text; the recognizer's current guess stays dimmed until it settles.
++    private var attributed: AttributedString {
++        let split = state.text.index(state.text.startIndex, offsetBy: min(state.settled, state.text.count))
++        var settled = AttributedString(state.text[..<split])
++        settled.foregroundColor = Theme.Colors.textPrimary
++        var guess = AttributedString(state.text[split...])
++        guess.foregroundColor = Theme.Colors.textSecondary
++        return settled + guess
++    }
++}
++
++private final class DictationBubblePanel: NSPanel, AnimatedPanel {
++    init(content: NSView) {
++        super.init(
++            contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
++            defer: false)
++        contentView = content
++        isOpaque = false
++        backgroundColor = .clear
++        hasShadow = true
++        level = .floating
++        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
++        hidesOnDeactivate = false
++        isReleasedWhenClosed = false
++        ignoresMouseEvents = true
++        followMotion()
++    }
++
++    // The capsule keeps key focus: Return and Escape belong to it.
++    override var canBecomeKey: Bool { false }
++    override var canBecomeMain: Bool { false }
++}
++
++/// The live transcript above the dictation capsule: the last few lines, growing upward from it.
++@MainActor
++final class DictationTranscriptBubble {
++    static let textWidth: CGFloat = 340
++    static let maximumLines = 3
++    static let tailCharacters = 180
++
++    private let state = DictationBubbleState()
++    private var panel: DictationBubblePanel?
++    private var hosting: NSView?
++
++    func show(_ transcript: DictationTranscript) {
++        let tail = transcript.tail(limit: Self.tailCharacters)
++        guard !tail.text.isEmpty else { return close() }
++        state.text = tail.text
++        state.settled = tail.settled
++        let panel = panel ?? makePanel()
++        guard let hosting, let frame = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame else { return }
++        hosting.layoutSubtreeIfNeeded()
++        let size = hosting.fittingSize
++        // The capsule is centred at a tenth of the screen's height; the bubble sits just above it.
++        let capsuleTop = frame.minY + frame.height * 0.1 + Theme.Size.dictationPanel.height / 2
++        panel.setFrame(
++            NSRect(
++                x: frame.midX - size.width / 2, y: capsuleTop + Theme.Spacing.md,
++                width: size.width, height: size.height),
++            display: true)
++        if !panel.isVisible { panel.orderFrontRegardless() }
++    }
++
++    func close() {
++        panel?.orderOut(nil)
++        panel = nil
++        hosting = nil
++    }
++
++    private func makePanel() -> DictationBubblePanel {
++        let hosting = NSHostingView(rootView: DictationBubbleView(state: state).motionScope())
++        let panel = DictationBubblePanel(content: hosting)
++        self.hosting = hosting
++        self.panel = panel
++        return panel
++    }
++}
+diff --git a/docs/features/dictation.md b/docs/features/dictation.md
+index 33c3278d524f1ffcadb40438b8b223ec5a9fdd33..d5f2bf71eb5b66de9cdac72e93eb771a5821e41b 100644
+--- a/docs/features/dictation.md
++++ b/docs/features/dictation.md
+@@ -151,3 +151,30 @@ Use the same audio, build configuration and otherwise idle machine for compariso
+ Optional arguments select a helper `.app`, model directory and one model's raw identifier instead of
+ all four. This tool is outside the deterministic suite and app targets; it neither downloads models
+ nor adds bundled resources.
++
++## Apple recognizer and live transcript (tinycast-roseblud)
++
++Settings → Dictation → Recognizer picks *Apple SpeechAnalyzer* (`SpeechTranscriber` through
++`SpeechAnalyzer`) instead of the downloaded models; the Model section is then disabled.
++
++- It runs in the app, not the helper: the analyzer is a system service, and the helper's pipe is one
++  request, one result. Nothing is downloaded by Tinycast; *Install* asks `AssetInventory` for the
++  system language's assets, which macOS manages. The locale follows the system language.
++- `DictationCapture.onSamples` hands every accepted sample to the recognizer on the capture queue.
++  An `AsyncStream` holds samples until the analyzer reports its format; conversion runs off-main.
++  Without Apple selected, the tap is nil.
++- The engine is read when a session begins. The token, cues, ducking, the five-minute limit,
++  Return/Escape and delivery are the chunked path's; finishing ends the input, waits for every pending
++  result to settle, then delivers what live insertion has not.
++- Live insertion pastes only finalized results. Volatile text is shown, never pasted.
++- *Show live transcript* (on by default) draws the last three lines above the capsule in a separate
++  nonactivating panel that never becomes key, so Return and Escape still reach the capsule. Settled
++  text is primary, volatile text secondary. The bubble and its toggle exist only with Apple
++  SpeechAnalyzer; Parakeet and Qwen show no live text, though Insert while recording still pastes
++  their chunks.
++- Both preferences are plain `UserDefaults` keys (`rosebludDictationEngine`, `rosebludDictationLiveTranscript`),
++  as the fork's patches keep them, so they are outside `settings.json` and backups.
++
++`dictation-transcript-test` checks settled and volatile assembly, delivery bookkeeping and the
++bubble's word-boundary tail. `dictation-field-test` stubs `DictationStreaming`, so its sessions stay
++on the chunked path.

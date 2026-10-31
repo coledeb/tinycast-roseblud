@@ -1,0 +1,28 @@
+diff --git a/Tinycast/DesignSystem/Theme.swift b/Tinycast/DesignSystem/Theme.swift
+index 91600a09624d6adb810255d9c9cf3bf8247d832b..8806564f81606a47e6730d79e82e9e617d6dea34 100644
+--- a/Tinycast/DesignSystem/Theme.swift
++++ b/Tinycast/DesignSystem/Theme.swift
+@@ -163,7 +163,7 @@ enum Theme {
+         static let menuSectionHeader: CGFloat = 16
+         /// Five rows and half of the sixth, so a capped menu reads as scrollable, not clipped.
+         static let menuVisibleRows: CGFloat = 5.5
+-        static let appMenuVisibleRows: CGFloat = 4.5
++        static let appMenuVisibleRows: CGFloat = 5
+         /// Rounded: a half-row of an odd pitch lands the glass edge on a half pixel.
+         static var menuRowsMaxHeight: CGFloat {
+             (menuVisibleRows * (menuRowHeight + menuRowSpacing)).rounded()
+diff --git a/docs/features/palette.md b/docs/features/palette.md
+index 24ffd1860300a8f85afc6e92acded3d2a278afa9..fb9ecb35259ff7a91c4231ba4b181c96c02b5e6e 100644
+--- a/docs/features/palette.md
++++ b/docs/features/palette.md
+@@ -517,8 +517,8 @@ row sits as far from it as from the search field's hairline. That height joins t
+ sizing, but the separator takes no selection index, so navigation still walks only rows. A menu
+ taller than its default cap ends its viewport mid-row, so the fold never lands on a separator or section
+ title, and both hairlines are one device pixel.
+-The app menu keeps its five actions in one group and caps the list at four and a half rows, leaving
+-Quit partially visible above the search band until scrolling or keyboard navigation reveals it.
++The app menu keeps its five actions in one group and caps the list at five rows, so Quit sits fully
++above the search band without scrolling.
+ Built-in action menus mark boundaries between opening or copying, managing the item, settings, and
+ deletion. Menus offering one kind of action, such as calculator copies, color formats, or emoji
+ transfers, keep their rows in one group.

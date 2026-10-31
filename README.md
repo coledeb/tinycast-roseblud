@@ -1,3 +1,40 @@
+# 🌹 Tinycast Roseblud Edition
+
+**Tinycast Roseblud Edition** is a personal, automatically synced fork of
+**[Tinycast Space Edition](https://github.com/sermelipharo/tinycast-space)**, itself a fork of
+**[Tinycast](https://github.com/abue-ammar/tinycast)** by [Abue Ammar](https://github.com/abue-ammar).
+It has everything Space Edition has, plus the few changes below.
+
+Download it from this repository's **[Releases](https://github.com/coledeb/tinycast-roseblud/releases)**;
+the steps are the same as in the [Install](#install) section below. Installed copies update themselves
+from here.
+
+## What Roseblud adds
+
+- **Apple SpeechAnalyzer dictation.** Settings → Dictation → Recognizer → *Apple SpeechAnalyzer* uses
+  the speech recognition built into macOS, so there is no model to download (*Install* fetches Apple's
+  language assets once). It follows your system language. With *Insert while recording* on, text is
+  pasted as each phrase settles.
+- **Live transcript.** With Apple SpeechAnalyzer, your words appear above the microphone as you speak,
+  in-progress words dimmed until they settle. Turn it off with *Show live transcript*.
+- **Search bar icon.** Settings → General → Appearance → *Search bar icon* swaps the magnifier at the
+  left of the search bar for any emoji you like.
+- **Quick AI hint in the compact bar.** The *Quick AI ⇥* hint now shows in the compact bar too, fading in
+  as the compact shortcuts slide out.
+- **Full app menu.** The menu behind the bottom-left button is tall enough to show *Quit Tinycast*
+  without scrolling.
+- **Clearer compact bar edges.** The compact bar's glass keeps a top and bottom highlight close to the
+  expanded window's, however strong your theme's background is.
+- **Crisper launcher prompt.** The *Search for apps and commands…* placeholder is brighter and easier
+  to read.
+- **Roseblud Edition.** About says *🌹 Roseblud Edition* and links here, and the in-app updater installs this
+  fork's releases.
+
+---
+
+> Everything below is Space Edition's README, kept as it is apart from its Releases and Issues links,
+> which point here.
+
 # ✨ Tinycast Space Edition
 
 **Tinycast Space Edition** is an unofficial, automatically synced fork of **[Tinycast](https://github.com/abue-ammar/tinycast)** by
@@ -59,7 +96,7 @@ upstream's releases.
 ## Install
 
 1. Download `Tinycast-<version>.dmg` from this fork's
-   **[Releases](https://github.com/sermelipharo/tinycast-space/releases)** and drag Tinycast to
+   **[Releases](https://github.com/coledeb/tinycast-roseblud/releases)** and drag Tinycast to
    Applications.
 2. The build is self-signed with this fork's own certificate (it is not notarized), so clear the
    quarantine flag once:
@@ -100,7 +137,7 @@ So please:
   maintainer to adopt, support or debug these patches.
 - **Report bugs where they belong.** If it also happens in the original Tinycast, report it
   [upstream](https://github.com/abue-ammar/tinycast/issues), following its templates and rules. If it
-  only happens here, open an issue [in this fork](https://github.com/sermelipharo/tinycast-space/issues).
+  only happens here, open an issue [in this fork](https://github.com/coledeb/tinycast-roseblud/issues).
 - **Support the author, not the fork.** The fork takes no donations. If Tinycast is useful to you,
   [tip Abue Ammar](https://buy.polar.sh/polar_cl_NDVFC20DKQpLcNawsh97QzbARBXD3WNn8v35R0mbJmT).
 
