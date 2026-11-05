@@ -496,6 +496,11 @@ final class AppCore {
             pendingURLs?.append(url)
             return
         }
+        // tinycast-space: the link extensions fire when a timer or task finishes.
+        if ConfettiOverlay.claims(url) {
+            if !ConfettiOverlay.fire() { showMessage("🎉") }
+            return
+        }
         if deepLinkCoordinator.handles(url) {
             deepLinkCoordinator.open(url)
             return
