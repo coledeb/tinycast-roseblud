@@ -22,6 +22,39 @@ enum BundleSignature {
         else { return false }
         // An unsealed bundle can claim any identity, and a nested helper is where one hides.
         let flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSCheckNestedCode)
-        return SecStaticCodeCheckValidity(staticCode, flags, requirement) == errSecSuccess
+        if SecStaticCodeCheckValidity(staticCode, flags, requirement) == errSecSuccess { return true }
+        return spaceMatchesRunningLeaf(staticCode, flags: flags)
+    }
+}
+
+// Space Edition: the fork signs with its own "Tinycast Self-Signed" key, never a Developer ID, so a
+// sealed bundle carrying the same leaf as the running copy is ours (upstream dropped this in dc265b2).
+extension BundleSignature {
+    fileprivate static func spaceMatchesRunningLeaf(_ staticCode: SecStaticCode, flags: SecCSFlags) -> Bool {
+        guard SecStaticCodeCheckValidity(staticCode, flags, nil) == errSecSuccess,
+            let running = spaceRunningLeaf(), let candidate = spaceLeaf(of: staticCode)
+        else { return false }
+        return running == candidate
+    }
+
+    fileprivate static func spaceRunningLeaf() -> Data? {
+        var code: SecCode?
+        guard SecCodeCopySelf([], &code) == errSecSuccess, let code else { return nil }
+        var staticCode: SecStaticCode?
+        guard SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode else {
+            return nil
+        }
+        return spaceLeaf(of: staticCode)
+    }
+
+    fileprivate static func spaceLeaf(of code: SecStaticCode) -> Data? {
+        var information: CFDictionary?
+        let flags = SecCSFlags(rawValue: kSecCSSigningInformation)
+        guard SecCodeCopySigningInformation(code, flags, &information) == errSecSuccess,
+            let dictionary = information as? [String: Any],
+            let certificates = dictionary[kSecCodeInfoCertificates as String] as? [SecCertificate],
+            let leaf = certificates.first
+        else { return nil }
+        return SecCertificateCopyData(leaf) as Data
     }
 }
