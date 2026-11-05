@@ -1,0 +1,58 @@
+diff --git a/Scripts/verify-signature.sh b/Scripts/verify-signature.sh
+index 1509f6a0958b73349a5eaee6e476180feb24403f..ac24392e2409ab25bf3c57a3df9c582b67ea89fa 100755
+--- a/Scripts/verify-signature.sh
++++ b/Scripts/verify-signature.sh
+@@ -34,8 +34,6 @@ for BIN in "$APP/Contents/MacOS/$NAME" "$APP/Contents/Helpers/ClipboardTextHelpe
+     INFO="$(codesign -dv --verbose=2 "$BIN" 2>&1)"
+     [[ "$INFO" =~ flags=0x[0-9a-f]+\([^\)]*runtime ]] ||
+         fail "${BIN##*/}: hardened runtime not enabled"
+-    [[ "$INFO" == *$'\nAuthority=Developer ID Application: '* && "$INFO" == *$'\nTimestamp='* ]] ||
+-        fail "${BIN##*/}: not signed with a timestamped Developer ID"
+ done
+ 
+ APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")"
+diff --git a/Tinycast/Features/Updates/Service/BundleSignature.swift b/Tinycast/Features/Updates/Service/BundleSignature.swift
+index a881276074651e1c4f6100dc7074e09a7b4d4b20..d573c79aa009d0dc9fa9c2ecbb4df98d1d3b9eb0 100644
+--- a/Tinycast/Features/Updates/Service/BundleSignature.swift
++++ b/Tinycast/Features/Updates/Service/BundleSignature.swift
+@@ -22,6 +22,39 @@ enum BundleSignature {
+         else { return false }
+         // An unsealed bundle can claim any identity, and a nested helper is where one hides.
+         let flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSCheckNestedCode)
+-        return SecStaticCodeCheckValidity(staticCode, flags, requirement) == errSecSuccess
++        if SecStaticCodeCheckValidity(staticCode, flags, requirement) == errSecSuccess { return true }
++        return spaceMatchesRunningLeaf(staticCode, flags: flags)
++    }
++}
++
++// Space Edition: the fork signs with its own "Tinycast Self-Signed" key, never a Developer ID, so a
++// sealed bundle carrying the same leaf as the running copy is ours (upstream dropped this in dc265b2).
++extension BundleSignature {
++    fileprivate static func spaceMatchesRunningLeaf(_ staticCode: SecStaticCode, flags: SecCSFlags) -> Bool {
++        guard SecStaticCodeCheckValidity(staticCode, flags, nil) == errSecSuccess,
++            let running = spaceRunningLeaf(), let candidate = spaceLeaf(of: staticCode)
++        else { return false }
++        return running == candidate
++    }
++
++    fileprivate static func spaceRunningLeaf() -> Data? {
++        var code: SecCode?
++        guard SecCodeCopySelf([], &code) == errSecSuccess, let code else { return nil }
++        var staticCode: SecStaticCode?
++        guard SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode else {
++            return nil
++        }
++        return spaceLeaf(of: staticCode)
++    }
++
++    fileprivate static func spaceLeaf(of code: SecStaticCode) -> Data? {
++        var information: CFDictionary?
++        let flags = SecCSFlags(rawValue: kSecCSSigningInformation)
++        guard SecCodeCopySigningInformation(code, flags, &information) == errSecSuccess,
++            let dictionary = information as? [String: Any],
++            let certificates = dictionary[kSecCodeInfoCertificates as String] as? [SecCertificate],
++            let leaf = certificates.first
++        else { return nil }
++        return SecCertificateCopyData(leaf) as Data
+     }
+ }
