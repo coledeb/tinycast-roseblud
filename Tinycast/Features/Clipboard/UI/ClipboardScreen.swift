@@ -70,7 +70,7 @@ struct ClipboardScreen: PaletteScreen {
     }
 
     private func activatePinned(at index: Int) -> Bool {
-        guard let item = store.pinnedItem(at: index, in: vm.query, filter: vm.clipboardFilter) else {
+        guard let item = store.numberedItem(at: index, in: vm.query, filter: vm.clipboardFilter) else {
             return false
         }
         core.clipboardCoordinator.activate(item)
