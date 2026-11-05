@@ -1,0 +1,180 @@
+diff --git a/Tinycast/Features/Launcher/Model/SearchTextSize.swift b/Tinycast/Features/Launcher/Model/SearchTextSize.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..efc88f075770940740382abec610ec0036918783
+--- /dev/null
++++ b/Tinycast/Features/Launcher/Model/SearchTextSize.swift
+@@ -0,0 +1,44 @@
++import AppKit
++import SwiftUI
++
++/// tinycast-roseblud: how large the launcher's query and prompt are drawn; an unset key reads as `.large`.
++enum SearchTextSize: String, CaseIterable, Identifiable, Sendable {
++    case small
++    case large
++
++    static let key = "rosebludSearchTextSize"
++
++    static var stored: SearchTextSize {
++        UserDefaults.standard.string(forKey: key).flatMap(SearchTextSize.init) ?? .large
++    }
++
++    var id: String { rawValue }
++
++    var title: String {
++        switch self {
++        case .small: String(localized: "Small")
++        case .large: String(localized: "Large")
++        }
++    }
++
++    /// `.large` is upstream's own size, so the default changes nothing.
++    private var basePoints: CGFloat {
++        switch self {
++        case .small: 17
++        case .large: Theme.Typography.searchFieldSize
++        }
++    }
++
++    /// Follows Interface size the way `InterfaceMetrics.Typography.searchFieldSize` does.
++    func points(_ metrics: InterfaceMetrics) -> CGFloat { metrics.scaled(basePoints) }
++
++    func font(_ metrics: InterfaceMetrics) -> Font {
++        self == .large ? metrics.typography.searchField : .system(size: points(metrics), weight: .regular)
++    }
++
++    @MainActor func nsFont(_ metrics: InterfaceMetrics) -> NSFont {
++        self == .large
++            ? metrics.typography.searchFieldNSFont
++            : NSFont.systemFont(ofSize: points(metrics), weight: .regular)
++    }
++}
+diff --git a/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift b/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift
+index 337a1cdee9f48b2ef58ccde56444bd51d5bb586e..8d9148f38fa225b93e242faa6d9885fef2185e98 100644
+--- a/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift
++++ b/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift
+@@ -82,6 +82,7 @@ struct GeneralSettingsView: View {
+                     SettingsRowTitle(.generalAppearance, "Show animations")
+                 }
+                 InterfaceSizeRow()
++                SearchTextSizeRow()  // tinycast-roseblud
+                 SearchBarIconRow()  // tinycast-roseblud
+                 WindowModeRow()
+                     .background {
+diff --git a/Tinycast/Features/Settings/Panes/SearchTextSizeRow.swift b/Tinycast/Features/Settings/Panes/SearchTextSizeRow.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..0990cdd7eb0b9c4eaec3c917f31d9644a2e2e4fd
+--- /dev/null
++++ b/Tinycast/Features/Settings/Panes/SearchTextSizeRow.swift
+@@ -0,0 +1,42 @@
++import SwiftUI
++
++/// tinycast-roseblud: Settings → General → Appearance, the launcher's search text size.
++/// Two glyph steps, drawn like `InterfaceSizeRow`'s so the rows read as a pair.
++struct SearchTextSizeRow: View {
++    /// Its own state, written through to the default: an `@AppStorage` write here changed the
++    /// launcher but never redrew this row's highlight.
++    @State private var size = SearchTextSize.stored
++
++    private static let glyph: [SearchTextSize: CGFloat] = [.small: 11, .large: 14]
++
++    var body: some View {
++        SettingsRow(
++            title: "Search text size",
++            subtitle: String(localized: "The text you type in the search bar, and its prompt."),
++            anchor: .generalAppearance
++        ) {
++            HStack(spacing: Theme.Spacing.xs) {
++                ForEach(SearchTextSize.allCases) { option in
++                    segment(option)
++                }
++            }
++        }
++    }
++
++    private func segment(_ option: SearchTextSize) -> some View {
++        let selected = size == option
++        return Button {
++            size = option
++            UserDefaults.standard.set(option.rawValue, forKey: SearchTextSize.key)
++        } label: {
++            Text(verbatim: "Aa")
++                .font(.system(size: Self.glyph[option] ?? 13, weight: .medium))
++                .foregroundStyle(selected ? Color.primary : Color.secondary)
++                .settingsOptionSegment(isSelected: selected)
++        }
++        .buttonStyle(.plain)
++        .accessibilityLabel(option.title)
++        .accessibilityAddTraits(selected ? [.isSelected] : [])
++        .help(option.title)
++    }
++}
+diff --git a/Tinycast/Features/Settings/SettingsSearchCatalog.swift b/Tinycast/Features/Settings/SettingsSearchCatalog.swift
+index 2b92a580bd9627ec5696925ee742c949083cccc9..e7d7ccd3eea9f16865a490767d243f8ae1bdfaab 100644
+--- a/Tinycast/Features/Settings/SettingsSearchCatalog.swift
++++ b/Tinycast/Features/Settings/SettingsSearchCatalog.swift
+@@ -163,6 +163,9 @@ enum SettingsSearchCatalog {
+         .init(
+             .generalAppearance, "Interface size",
+             keywords: ["text size", "font size", "scale", "zoom", "bigger", "larger", "legible"]),
++        .init(  // tinycast-roseblud
++            .generalAppearance, "Search text size",
++            keywords: ["font size", "query", "prompt", "smaller", "compact"]),
+         .init(  // tinycast-roseblud
+             .generalAppearance, "Search bar icon", keywords: ["emoji", "magnifier", "glyph"]),
+         .init(
+diff --git a/Tinycast/Palette/RootPaletteView.swift b/Tinycast/Palette/RootPaletteView.swift
+index f117c6ae2cf7bf08cc542fc5774b72ccd3a6b45d..9eb03532b80121b43e71cd9165ffcd616f01f7e3 100644
+--- a/Tinycast/Palette/RootPaletteView.swift
++++ b/Tinycast/Palette/RootPaletteView.swift
+@@ -26,6 +26,7 @@ struct RootPaletteView: View {
+     @Environment(AppSettings.self) private var settings
+     @Environment(\.metrics) private var metrics
+     @Environment(\.openURL) private var openURL
++    @AppStorage(SearchTextSize.key) private var searchTextSize = SearchTextSize.large  // tinycast-roseblud
+     @FocusState private var searchFocused: Bool
+     /// Kept apart from the search field's own focus. See docs/features/palette.md.
+     @FocusState private var argumentFocused: String?
+@@ -921,7 +922,7 @@ struct RootPaletteView: View {
+ 
+     /// Capped to keep the strip on screen; empty, it measures the prompt so the strip follows it.
+     private func searchFieldWidth(for accessory: PaletteHeaderAccessory) -> CGFloat {
+-        let font = metrics.typography.searchFieldNSFont
++        let font = searchTextSize.nsFont(metrics)  // tinycast-roseblud
+         let text = vm.query.isEmpty ? searchPrompt : vm.query
+         let typed = (text as NSString).size(withAttributes: [.font: font]).width
+         let chrome = metrics.size.headerIconSlot + metrics.spacing.md * 3 + metrics.spacing.xl
+@@ -946,7 +947,7 @@ struct RootPaletteView: View {
+         @Bindable var vm = vm
+         return TextField("", text: $vm.query)
+             .textFieldStyle(.plain)
+-            .font(metrics.typography.searchField)
++            .font(searchTextSize.font(metrics))  // tinycast-roseblud
+             .tint(Theme.Colors.textPrimary)
+             .focused($searchFocused)
+             // Fills the row's height, so there's no gap above it for topDragStrip to meet.
+@@ -955,7 +956,7 @@ struct RootPaletteView: View {
+                 // An IME's marked text leaves `query` empty, so the placeholder would overlap it.
+                 if vm.query.isEmpty, !vm.isComposing {
+                     Text(searchPrompt)
+-                        .font(metrics.typography.searchField)
++                        .font(searchTextSize.font(metrics))  // tinycast-roseblud
+                         .foregroundStyle(Theme.Colors.textTertiary)
+                         .lineLimit(1)
+                         // Never a click target: tapping the placeholder must still land the caret.
+diff --git a/docs/features/palette.md b/docs/features/palette.md
+index 844065fd946ad905b7c54b6cf34d4583e45bb9cb..c6761257411aa933b64cc7a1e62018e56c36693d 100644
+--- a/docs/features/palette.md
++++ b/docs/features/palette.md
+@@ -176,6 +176,12 @@ On the launcher the slot holds `LauncherSearchIcon`: the mode's symbol, or the e
+ Settings → General → Appearance → *Search bar icon* (`SearchBarIcon`, kept in the plain
+ `rosebludSearchBarIcon` / `rosebludSearchBarEmoji` defaults, outside `settings.json` and backups).
+ 
++The search field's query and prompt are drawn at *Search text size* (Settings → General →
++Appearance, `SearchTextSize` in the plain `rosebludSearchTextSize` default): *Large* is
++`Theme.Typography.searchFieldSize` (20pt), the default, and *Small* is 17pt. Both scale with
++Interface Size; the header height does not change, so the text only sits smaller in the same bar.
++`searchFieldWidth(for:)` measures with the same font, so a header accessory still follows the prompt.
++
+ The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap, in the
+ compact bar as well as the full window. Beside compact shortcuts, `CompactBarRevealFade` holds it back
+ until the capsule has settled, then fades it in with the first button's glyph.
