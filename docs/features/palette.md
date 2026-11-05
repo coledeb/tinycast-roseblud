@@ -176,6 +176,12 @@ On the launcher the slot holds `LauncherSearchIcon`: the mode's symbol, or the e
 Settings → General → Appearance → *Search bar icon* (`SearchBarIcon`, kept in the plain
 `rosebludSearchBarIcon` / `rosebludSearchBarEmoji` defaults, outside `settings.json` and backups).
 
+The search field's query and prompt are drawn at *Search text size* (Settings → General →
+Appearance, `SearchTextSize` in the plain `rosebludSearchTextSize` default): *Large* is
+`Theme.Typography.searchFieldSize` (20pt), the default, and *Small* is 17pt. Both scale with
+Interface Size; the header height does not change, so the text only sits smaller in the same bar.
+`searchFieldWidth(for:)` measures with the same font, so a header accessory still follows the prompt.
+
 The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap, in the
 compact bar as well as the full window. Beside compact shortcuts, `CompactBarRevealFade` holds it back
 until the capsule has settled, then fades it in with the first button's glyph.
