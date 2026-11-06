@@ -281,6 +281,9 @@ screen. Palette screens push over root search as before; Show Notes closes the p
 its existing window. The summon reveal still animates independently.
 Both compact and expanded surfaces use native regular glass without a custom scrim.
 The compact capsule and buttons have no additional surface mask or painted fill.
+Under a Raycast theme, `CompactBarBackdrop` is the exception: it paints the expanded panel's
+`SpaceTheme.backdrop` gradient over those shapes, masked to them and skipping a selected button.
+With no theme the gradient is clear.
 
 At expanded launcher root, Escape clears the query while setting `forceExpanded`, so clearing and
 collapsing remain separate presses. The next Escape clears that flag and collapses; another closes.
