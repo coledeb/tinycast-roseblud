@@ -27,6 +27,10 @@ final class FileSearchCoordinator {
         self.core = core
         indexer.onIndexChanged = { [weak session] in session?.refresh() }
         indexer.onRecentChanged = { [weak session] in session?.refreshRecent() }
+        session.folderScope = { [weak palette] in
+            palette?.isInFileSearchFolder == true ? palette?.fileSearchFolder : nil
+        }
+        palette.onFileSearchFolderChanged = { [weak self] in self?.folderChanged() }
     }
 
     func applyEnabled() {
@@ -71,13 +75,26 @@ final class FileSearchCoordinator {
         else {
             return []
         }
-        let results = showsFilesInLauncher && FileSearchQuery.answersLauncher(query) ? session.results : []
+        let results = showsFilesInLauncher && FileSearchQuery.answersLauncher(query) ? session.results() : []
         return FileSearchQuery.launcherResults(query, favorites: favoriteFiles, indexed: results)
     }
 
     func applyLauncherFiles() {
         guard palette.mode == .launcher else { return }
         searchFromLauncher(palette.query)
+    }
+
+    func searchInFolder(_ result: FileSearchResult) {
+        guard palette.mode == .fileSearch, result.isDirectory else { return }
+        palette.rewriteQuery("")
+        palette.fileSearchFolder = result.id
+    }
+
+    /// The folder is part of the request, so entering or leaving it lands the list and searches again.
+    private func folderChanged() {
+        guard palette.mode == .fileSearch else { return }
+        palette.resetToken = UUID()
+        session.search(palette.query, filter: palette.fileSearchFilter)
     }
 
     func rebuildIndex() {
