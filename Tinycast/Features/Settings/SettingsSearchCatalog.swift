@@ -163,6 +163,8 @@ enum SettingsSearchCatalog {
         .init(
             .generalAppearance, "Interface size",
             keywords: ["text size", "font size", "scale", "zoom", "bigger", "larger", "legible"]),
+        .init(  // tinycast-roseblud
+            .generalAppearance, "Search bar icon", keywords: ["emoji", "magnifier", "glyph"]),
         .init(
             .generalAppearance, "Window mode",
             keywords: ["compact", "expanded", "slim", "search bar", "small"]),
