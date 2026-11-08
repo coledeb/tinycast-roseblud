@@ -353,6 +353,7 @@ struct RootPaletteView: View {
                 )
                 // The window's frame is the size source, so the glass and clip stay matched.
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(SpaceTheme.backdrop(hidden: isCollapsed))  // tinycast-space: a theme's gradient
                 .background(isCollapsed ? .clear : Theme.Colors.panelScrim)
                 // Square, as rounded glass feathers its edge; the clip alone cuts a crisp corner.
                 .background {
@@ -444,6 +445,8 @@ struct RootPaletteView: View {
                 extensions.dispatch(handler: handler, arguments: [vm.query])
             }
             .modifier(ExtensionSelectionForwarder(screen: extensionScreen, selection: vm.selection))
+            // tinycast-space: a highlighted row offering a raycast://theme link previews it.
+            .modifier(RaycastThemeLinkPreview(screen: extensionScreen, selection: vm.selection))
             // A narrower list means the old index points at a different row, or at none.
             .onChange(of: vm.clipboardFilter) { land(restoringSelection: true) }
             // The filter is part of the query, so narrowing re-runs it rather than thinning rows.
