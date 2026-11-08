@@ -146,7 +146,12 @@ final class UpdateCoordinator {
         core.showProgress(String(localized: "Checking for updates…"))
         Task { [weak self] in
             guard let self else { return }
-            let answered = await store.check()
+            var failure: UpdateFailure?
+            do {
+                try await store.check()
+            } catch {
+                failure = error as? UpdateFailure ?? .checkFailed(error.localizedDescription)
+            }
             if let release = store.update {
                 core.hideProgress()
                 stage = .available(release)
@@ -154,12 +159,13 @@ final class UpdateCoordinator {
                 return
             }
             stage = .idle
-            if answered {
+            if let failure {
                 core.showMessage(
-                    String(localized: "\(Bundle.main.appDisplayName) is up to date"))
+                    [failure.errorDescription, failure.recoverySuggestion].compactMap(\.self).joined(separator: " "),
+                    tone: .danger)
             } else {
                 core.showMessage(
-                    String(localized: "Tinycast could not reach GitHub."), tone: .danger)
+                    String(localized: "\(Bundle.main.appDisplayName) is up to date"))
             }
         }
     }
