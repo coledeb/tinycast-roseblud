@@ -1,0 +1,484 @@
+diff --git a/Scripts/run-tests.sh b/Scripts/run-tests.sh
+index e2ede24e1697239652bbeb90d8175c2a25afc7af..e7f9e422da3f45d1f5a1ed37a5f0caf73d67450d 100755
+--- a/Scripts/run-tests.sh
++++ b/Scripts/run-tests.sh
+@@ -369,6 +369,7 @@ run DictionarySessionTests Tinycast/Features/Dictionary/Model/DictionaryEntry.sw
+ run DictationTests         Tinycast/Features/Dictation/Model/DictationModel.swift Tinycast/Features/Dictation/Model/DictationIdleRelease.swift Tinycast/Features/Dictation/Model/DictationLanguage.swift Tinycast/Features/Dictation/Model/DictationTextFormatter.swift
+ run DictationCueTests      Tinycast/Features/Dictation/Service/DictationCueRunner.swift
+ run DictationTranscriptTests Tinycast/Features/Dictation/Model/DictationTranscript.swift
++run SearchBarIconTests     Tinycast/Features/Launcher/Model/SearchBarIcon.swift
+ run DictationFieldTests    Tinycast/Features/Dictation/Model/DictationModel.swift \
+                            Tinycast/Features/Dictation/Model/DictationAudioChunks.swift \
+                            Tinycast/Features/Dictation/Model/DictationMode.swift \
+diff --git a/Tests/SearchBarIconTests.swift b/Tests/SearchBarIconTests.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..d7025464386182c81aad58050ae6482db5f5438f
+--- /dev/null
++++ b/Tests/SearchBarIconTests.swift
+@@ -0,0 +1,28 @@
++import Foundation
++
++@main
++struct SearchBarIconTests {
++    static func main() {
++        func check<T: Equatable>(_ actual: T, _ expected: T, _ label: String) {
++            guard actual == expected else {
++                print("\(label): expected \(String(describing: expected)), got \(String(describing: actual))")
++                exit(1)
++            }
++        }
++
++        check(SearchBarIcon.emoji(in: "🚀"), "🚀", "a lone emoji is kept")
++        check(SearchBarIcon.emoji(in: "😀🚀"), "🚀", "a new pick replaces the old one")
++        check(SearchBarIcon.emoji(in: "🚀a"), "🚀", "letters typed after it are ignored")
++        check(SearchBarIcon.emoji(in: "abc"), nil, "plain text is no emoji")
++        check(SearchBarIcon.emoji(in: ""), nil, "nothing is no emoji")
++        check(SearchBarIcon.emoji(in: "1"), nil, "a digit is no emoji")
++        check(SearchBarIcon.emoji(in: "©"), nil, "a text-style symbol is no emoji")
++        check(SearchBarIcon.emoji(in: "❤️"), "❤️", "a variation selector makes one")
++        check(SearchBarIcon.emoji(in: "👍🏽"), "👍🏽", "a skin tone stays with its emoji")
++        check(SearchBarIcon.emoji(in: "👩‍💻"), "👩‍💻", "a ZWJ sequence is one emoji")
++        check(SearchBarIcon.emoji(in: "🇫🇷"), "🇫🇷", "a flag is one emoji")
++        check(SearchBarIcon.emoji(in: "1️⃣"), "1️⃣", "a keycap is one emoji")
++        check(SearchBarIcon.emoji(in: SearchBarIcon.defaultEmoji), SearchBarIcon.defaultEmoji, "the default is one")
++        print("search bar icon tests passed")
++    }
++}
+diff --git a/Tinycast/Features/Launcher/Model/SearchBarIcon.swift b/Tinycast/Features/Launcher/Model/SearchBarIcon.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..a96ff4851ece5923032e3c71a931b21efe31da43
+--- /dev/null
++++ b/Tinycast/Features/Launcher/Model/SearchBarIcon.swift
+@@ -0,0 +1,23 @@
++import Foundation
++
++/// tinycast-roseblud: what the launcher's search bar shows at its left, before the query.
++enum SearchBarIcon: String, CaseIterable, Sendable {
++    case magnifier
++    case emoji
++
++    static let styleKey = "rosebludSearchBarIcon"
++    static let emojiKey = "rosebludSearchBarEmoji"
++    static let defaultEmoji = "😀"
++
++    /// The last emoji in `text`, so a new pick typed after the old one replaces it.
++    static func emoji(in text: String) -> String? {
++        text.last(where: isEmoji).map(String.init)
++    }
++
++    /// A lone scalar like `©` or `1` is only an emoji with presentation; a sequence is one outright.
++    private static func isEmoji(_ character: Character) -> Bool {
++        let scalars = character.unicodeScalars
++        guard let first = scalars.first, first.properties.isEmoji else { return false }
++        return first.properties.isEmojiPresentation || scalars.count > 1
++    }
++}
+diff --git a/Tinycast/Features/Launcher/UI/LauncherSearchIcon.swift b/Tinycast/Features/Launcher/UI/LauncherSearchIcon.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..d00d33dced24e697e6f8d08249737cb67e82d5f7
+--- /dev/null
++++ b/Tinycast/Features/Launcher/UI/LauncherSearchIcon.swift
+@@ -0,0 +1,24 @@
++import SwiftUI
++
++/// tinycast-roseblud: the launcher's leading icon, its mode symbol or the emoji chosen in Settings.
++struct LauncherSearchIcon: View {
++    let systemImage: String
++    @AppStorage(SearchBarIcon.styleKey) private var style = SearchBarIcon.magnifier
++    @AppStorage(SearchBarIcon.emojiKey) private var emoji = SearchBarIcon.defaultEmoji
++    @Environment(\.metrics) private var metrics
++
++    var body: some View {
++        switch style {
++        case .magnifier:
++            Image(systemName: systemImage)
++                .font(metrics.typography.headerIcon)
++                .symbolRenderingMode(.hierarchical)
++                .foregroundStyle(.secondary)
++        case .emoji:
++            // A hand-edited default could hold anything, and the bar must never show text.
++            Text(verbatim: SearchBarIcon.emoji(in: emoji) ?? SearchBarIcon.defaultEmoji)
++                .font(metrics.typography.headerIcon)
++                .accessibilityHidden(true)
++        }
++    }
++}
+diff --git a/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift b/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift
+index af4929a77c4b41e2504e9ec03f613bd18356e884..337a1cdee9f48b2ef58ccde56444bd51d5bb586e 100644
+--- a/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift
++++ b/Tinycast/Features/Settings/Panes/GeneralSettingsView.swift
+@@ -82,6 +82,7 @@ struct GeneralSettingsView: View {
+                     SettingsRowTitle(.generalAppearance, "Show animations")
+                 }
+                 InterfaceSizeRow()
++                SearchBarIconRow()  // tinycast-roseblud
+                 WindowModeRow()
+                     .background {
+                         if !settings.compactMode {
+diff --git a/Tinycast/Features/Settings/Panes/SearchBarEmojiPicker.swift b/Tinycast/Features/Settings/Panes/SearchBarEmojiPicker.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..c16321021cc61156c46ac2caa913c43c3a08872d
+--- /dev/null
++++ b/Tinycast/Features/Settings/Panes/SearchBarEmojiPicker.swift
+@@ -0,0 +1,68 @@
++import SwiftUI
++
++/// tinycast-roseblud: the search bar icon's emoji popover, searched like the Emoji screen.
++struct SearchBarEmojiPicker: View {
++    let onPick: (String) -> Void
++    @Environment(AppCore.self) private var core
++    @Environment(AppSettings.self) private var settings
++    @State private var query = ""
++    @FocusState private var searchFocused: Bool
++
++    private static let columnCount = 8
++    private static let cell: CGFloat = 32
++    private static let height: CGFloat = 300
++
++    private var columns: [GridItem] {
++        Array(repeating: GridItem(.fixed(Self.cell), spacing: Theme.Spacing.sm), count: Self.columnCount)
++    }
++
++    var body: some View {
++        let results = results
++        return VStack(spacing: Theme.Spacing.md) {
++            // The popover inherits the Settings form's style, which right-aligns its fields.
++            TextField("", text: $query, prompt: Text("Search…"))
++                .labelsHidden()
++                .multilineTextAlignment(.leading)
++                .textFieldStyle(.roundedBorder)
++                .focused($searchFocused)
++                .onSubmit { results.first.map(pick) }
++            ScrollView {
++                LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
++                    ForEach(results) { entry in
++                        Button { pick(entry) } label: {
++                            Text(verbatim: glyph(entry))
++                                .font(.system(size: 22))
++                                .frame(width: Self.cell, height: Self.cell)
++                                .contentShape(Rectangle())
++                        }
++                        .buttonStyle(.plain)
++                        .help(entry.displayName)
++                    }
++                }
++            }
++            .overlay {
++                if results.isEmpty { Text("No Results").foregroundStyle(.secondary) }
++            }
++        }
++        .padding(Theme.Spacing.md)
++        .frame(width: width, height: Self.height)
++        .onAppear { searchFocused = true }
++    }
++
++    private var width: CGFloat {
++        CGFloat(Self.columnCount) * (Self.cell + Theme.Spacing.sm) + Theme.Spacing.md * 2
++    }
++
++    /// Symbols and text-style characters share the catalog, but only an emoji may stand in the bar.
++    private var results: [EmojiEntry] {
++        let index = core.emojiIndex
++        let entries =
++            query.isEmpty
++            ? index.categorySections.flatMap(\.entries) : index.search(query, frequent: core.frequentEmoji)
++        return entries.filter { SearchBarIcon.emoji(in: $0.glyph) == $0.glyph }
++    }
++
++    private func glyph(_ entry: EmojiEntry) -> String { entry.display(tone: settings.emojiSkinTone) }
++
++    private func pick(_ entry: EmojiEntry) { onPick(glyph(entry)) }
++}
+diff --git a/Tinycast/Features/Settings/Panes/SearchBarIconRow.swift b/Tinycast/Features/Settings/Panes/SearchBarIconRow.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee7eb0939b8dd7715d19c08d28af699797300f04
+--- /dev/null
++++ b/Tinycast/Features/Settings/Panes/SearchBarIconRow.swift
+@@ -0,0 +1,62 @@
++import SwiftUI
++
++/// tinycast-roseblud: Settings → General → Appearance, the launcher's search bar icon.
++struct SearchBarIconRow: View {
++    @AppStorage(SearchBarIcon.styleKey) private var style = SearchBarIcon.magnifier
++    @AppStorage(SearchBarIcon.emojiKey) private var emoji = SearchBarIcon.defaultEmoji
++    @State private var picking = false
++
++    var body: some View {
++        LabeledContent {
++            HStack(spacing: Theme.Spacing.sm) {
++                SearchBarIconTile(isSelected: style == .magnifier, help: "Search icon") {
++                    style = .magnifier
++                } label: {
++                    Image(systemName: PaletteMode.launcher.systemImage)
++                        .font(Theme.Typography.headerIcon)
++                        .symbolRenderingMode(.hierarchical)
++                        .foregroundStyle(.secondary)
++                }
++                SearchBarIconTile(isSelected: style == .emoji, help: "Choose an emoji") {
++                    style = .emoji
++                    picking = true
++                } label: {
++                    Text(verbatim: shownEmoji).font(Theme.Typography.headerIcon)
++                }
++                .popover(isPresented: $picking, arrowEdge: .bottom) {
++                    SearchBarEmojiPicker { picked in
++                        emoji = picked
++                        picking = false
++                    }
++                }
++            }
++        } label: {
++            SettingsRowTitle(.generalAppearance, "Search bar icon")
++        }
++    }
++
++    private var shownEmoji: String { SearchBarIcon.emoji(in: emoji) ?? SearchBarIcon.defaultEmoji }
++}
++
++/// One choice, drawn at the search bar's own icon size; the chosen one sits on a filled tile.
++private struct SearchBarIconTile<Label: View>: View {
++    let isSelected: Bool
++    let help: LocalizedStringKey
++    let action: () -> Void
++    @ViewBuilder let label: Label
++
++    private static var side: CGFloat { 36 }
++
++    var body: some View {
++        Button(action: action) {
++            label
++                .frame(width: Self.side, height: Self.side)
++                .background(
++                    RoundedRectangle(cornerRadius: Theme.Radius.barControl, style: .continuous)
++                        .fill(isSelected ? Theme.Colors.selection : Color.clear))
++                .contentShape(Rectangle())
++        }
++        .buttonStyle(.plain)
++        .help(help)
++    }
++}
+diff --git a/Tinycast/Features/Settings/SettingsSearchCatalog.swift b/Tinycast/Features/Settings/SettingsSearchCatalog.swift
+index 892be45251a9ea46c016979264832d5b79751d54..f0a1db1d14709e1e27e163243aec48c6587f0891 100644
+--- a/Tinycast/Features/Settings/SettingsSearchCatalog.swift
++++ b/Tinycast/Features/Settings/SettingsSearchCatalog.swift
+@@ -166,6 +166,8 @@ enum SettingsSearchCatalog {
+         .init(
+             .generalAppearance, "Interface size",
+             keywords: ["text size", "font size", "scale", "zoom", "bigger", "larger", "legible"]),
++        .init(  // tinycast-roseblud
++            .generalAppearance, "Search bar icon", keywords: ["emoji", "magnifier", "glyph"]),
+         .init(
+             .generalAppearance, "Window mode",
+             keywords: ["compact", "expanded", "slim", "search bar", "small"]),
+diff --git a/Tinycast/Palette/RootPaletteView.swift b/Tinycast/Palette/RootPaletteView.swift
+index b15e2bbaaf9a6cd477918b5674769897c4556bad..86e20402b36c40799afab680b1097a13626ae9c0 100644
+--- a/Tinycast/Palette/RootPaletteView.swift
++++ b/Tinycast/Palette/RootPaletteView.swift
+@@ -800,10 +800,7 @@ struct RootPaletteView: View {
+             if vm.mode != .launcher {
+                 HeaderBackButton(help: backHelp, action: goBack)
+             } else {
+-                Image(systemName: vm.mode.systemImage)
+-                    .font(metrics.typography.headerIcon)
+-                    .symbolRenderingMode(.hierarchical)
+-                    .foregroundStyle(.secondary)
++                LauncherSearchIcon(systemImage: vm.mode.systemImage)  // tinycast-roseblud
+                     .frame(width: metrics.size.headerIconSlot)
+                     .windowDraggable(settings.paletteDraggable, onBegan: beginDrag, onEnded: endDrag)
+             }
+diff --git a/Tinycast/Resources/Localizable.xcstrings b/Tinycast/Resources/Localizable.xcstrings
+index 0369dc484ab7c6c01c5a695599b7cd2611ed19f6..da4fb761f86427a73934edcf0a9ece768d418e31 100644
+--- a/Tinycast/Resources/Localizable.xcstrings
++++ b/Tinycast/Resources/Localizable.xcstrings
+@@ -33755,6 +33755,58 @@
+         }
+       }
+     },
++    "Choose an emoji" : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Emoji auswählen"
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Elegir un emoji"
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Choisir un emoji"
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "絵文字を選択"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "이모지 선택"
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Escolher um emoji"
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Выбрать эмодзи"
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "选择表情符号"
++          }
++        }
++      }
++    },
+     "Choose an icon" : {
+       "localizations" : {
+         "de" : {
+@@ -107178,6 +107230,58 @@
+         }
+       }
+     },
++    "Search bar icon" : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Suchleisten-Symbol"
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Icono de la barra de búsqueda"
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Icône de la barre de recherche"
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "検索バーのアイコン"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "검색 막대 아이콘"
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Ícone da barra de busca"
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Значок строки поиска"
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "搜索栏图标"
++          }
++        }
++      }
++    },
+     "Search by model or company" : {
+       "localizations" : {
+         "de" : {
+@@ -107854,6 +107958,58 @@
+         }
+       }
+     },
++    "Search icon" : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Lupensymbol"
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Icono de búsqueda"
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Icône de recherche"
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "検索アイコン"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "검색 아이콘"
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Ícone de busca"
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Значок поиска"
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "搜索图标"
++          }
++        }
++      }
++    },
+     "Search layouts…" : {
+       "localizations" : {
+         "de" : {
+diff --git a/docs/features/palette.md b/docs/features/palette.md
+index be705b777af9d1400150132b8ecb22fd27e48e63..3a2227f06fd999ebf736273685ff4181b889b216 100644
+--- a/docs/features/palette.md
++++ b/docs/features/palette.md
+@@ -172,6 +172,10 @@ pops, a root one closes — so `backHelp` says which, rather than promising a st
+ a close. It lights to `textPrimary` under the pointer over `Theme.Duration.hover`, and
+ `HeaderBackButton` keeps that hover state to itself so the header around it never re-renders.
+ 
++On the launcher the slot holds `LauncherSearchIcon`: the mode's symbol, or the emoji picked under
++Settings → General → Appearance → *Search bar icon* (`SearchBarIcon`, kept in the plain
++`rosebludSearchBarIcon` / `rosebludSearchBarEmoji` defaults, outside `settings.json` and backups).
++
+ The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap.
+ It is drawn only when Tab really would open Quick AI, a condition read
+ back out of `PaletteTabAction` rather than restated, so a hint can never promise a destination the
