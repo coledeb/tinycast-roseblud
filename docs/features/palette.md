@@ -280,6 +280,9 @@ its existing window. The summon reveal still animates independently.
 The compact bar lays `panelScrim` over its capsule and buttons through a mask that follows the
 reveal, as the expanded panel lays it over its glass; the selected button stays out of the mask so
 its tint reads undimmed.
+Under a Raycast theme, `CompactBarBackdrop` then paints the expanded panel's `SpaceTheme.backdrop`
+gradient over the scrim, through the same shapes and also skipping a selected button, so the bar
+stacks glass, scrim and gradient as the expanded panel does. With no theme the gradient is clear.
 
 At expanded launcher root, Escape clears the query while setting `forceExpanded`, so clearing and
 collapsing remain separate presses. The next Escape clears that flag and collapses; another closes.
