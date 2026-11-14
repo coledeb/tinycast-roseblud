@@ -522,3 +522,19 @@ enum Paster {
 }
 
 enum DialogTone { case danger }
+
+// tinycast-roseblud: these sessions take the chunked path, so Apple's recognizer never starts.
+@MainActor
+final class DictationStreaming {
+    static var usesAppleSpeech: Bool { false }
+    var isApple: Bool { false }
+    func begin(
+        apple: Bool, capture: DictationCapture, onResult: @escaping (String, Bool) -> Void,
+        onFailure: @escaping (any Error) -> Void
+    ) {}
+    func apply(_ text: String, isFinal: Bool) {}
+    func takeSettled() -> String { "" }
+    func finish() async {}
+    func closeBubble() {}
+    func end() {}
+}
