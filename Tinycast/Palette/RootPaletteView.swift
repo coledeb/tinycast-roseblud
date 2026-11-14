@@ -800,10 +800,7 @@ struct RootPaletteView: View {
             if vm.mode != .launcher {
                 HeaderBackButton(help: backHelp, action: goBack)
             } else {
-                Image(systemName: vm.mode.systemImage)
-                    .font(metrics.typography.headerIcon)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.secondary)
+                LauncherSearchIcon(systemImage: vm.mode.systemImage)  // tinycast-roseblud
                     .frame(width: metrics.size.headerIconSlot)
                     .windowDraggable(settings.paletteDraggable, onBegan: beginDrag, onEnded: endDrag)
             }

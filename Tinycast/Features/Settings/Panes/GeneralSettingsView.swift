@@ -82,6 +82,7 @@ struct GeneralSettingsView: View {
                     SettingsRowTitle(.generalAppearance, "Show animations")
                 }
                 InterfaceSizeRow()
+                SearchBarIconRow()  // tinycast-roseblud
                 WindowModeRow()
                     .background {
                         if !settings.compactMode {

@@ -172,6 +172,10 @@ pops, a root one closes — so `backHelp` says which, rather than promising a st
 a close. It lights to `textPrimary` under the pointer over `Theme.Duration.hover`, and
 `HeaderBackButton` keeps that hover state to itself so the header around it never re-renders.
 
+On the launcher the slot holds `LauncherSearchIcon`: the mode's symbol, or the emoji picked under
+Settings → General → Appearance → *Search bar icon* (`SearchBarIcon`, kept in the plain
+`rosebludSearchBarIcon` / `rosebludSearchBarEmoji` defaults, outside `settings.json` and backups).
+
 The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap.
 It is drawn only when Tab really would open Quick AI, a condition read
 back out of `PaletteTabAction` rather than restated, so a hint can never promise a destination the
