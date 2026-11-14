@@ -46,6 +46,7 @@ struct CompactBar: View {
     @Environment(\.metrics) private var metrics
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isRevealed = false
+    @AppStorage(SpaceTheme.compactKey) private var themed = true  // tinycast-space
 
     var body: some View {
         let geometry = CompactBarGeometry(metrics: metrics, count: commands.count)
@@ -78,7 +79,7 @@ struct CompactBar: View {
                 capsule.fill(.clear)
                     .frame(width: geometry.capsuleWidth(revealed: revealed))
                     .frame(maxHeight: .infinity)
-                    .glassEffect(.regular, in: capsule)
+                    .glassEffect(.regular.tint(tint(selected: false)), in: capsule)  // tinycast-space
                     .animation(
                         reduceMotion ? nil : BarMotion.capsule.delay(BarMotion.revealDelay),
                         value: revealed)
@@ -107,7 +108,7 @@ struct CompactBar: View {
         .accessibilityAddTraits(selection == command ? [.isSelected] : [])
         .accessibilityHidden(!revealed)
         .glassEffect(
-            .regular.tint(selection == command ? Theme.Colors.compactShortcutSelectionTint : nil)
+            .regular.tint(tint(selected: selection == command))  // tinycast-space
                 .interactive(), in: .circle
         )
         .scaleEffect(revealed ? 1 : BarMotion.parkedScale)
@@ -155,7 +156,7 @@ struct CompactBar: View {
         )
         .environment(\.symbolVariants, .none)
         .foregroundStyle(
-            selection == command ? Theme.Colors.compactShortcutSelectedInk : Theme.Colors.textSecondary
+            selection == command ? selectedInk : Theme.Colors.textSecondary  // tinycast-space
         )
         .animation(fade(index)) {
             $0.opacity(revealed ? 1 : 0).blur(radius: revealed ? 0 : BarMotion.glyphBlur)
@@ -194,5 +195,18 @@ struct CompactBar: View {
         try? await Task.sleep(for: .seconds(Motion.duration(BarMotion.parkAfterHide)))
         guard !Task.isCancelled else { return }
         withTransaction(\.disablesAnimations, true) { isRevealed = false }
+    }
+}
+
+// tinycast-space: with *Theme the compact bar* on, a Raycast theme tints the bar's glass and inks its
+// selected button; off, or with no theme, the bar is Tinycast's own.
+extension CompactBar {
+    private func tint(selected: Bool) -> Color? {
+        (themed ? SpaceTheme.compactTint(selected: selected) : nil)
+            ?? (selected ? Theme.Colors.compactShortcutSelectionTint : nil)
+    }
+
+    private var selectedInk: Color {
+        (themed ? SpaceTheme.compactSelectedInk : nil) ?? Theme.Colors.compactShortcutSelectedInk
     }
 }
