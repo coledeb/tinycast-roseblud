@@ -9,6 +9,8 @@ final class DictionarySession {
         let scope: DictionaryScope
         /// Nil when no enabled dictionary knows the term.
         let entry: DictionaryEntry?
+        /// Spellings to try instead, asked for only when `entry` is nil.
+        let suggestions: [String]
     }
 
     /// The last answered lookup; it stays up while the next term resolves, so typing never blanks.
@@ -17,9 +19,24 @@ final class DictionarySession {
     private(set) var hasThesaurus = false
     @ObservationIgnored private var term = ""
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private let findEntry: @Sendable (String, DictionaryScope) async -> DictionaryEntry?
+    @ObservationIgnored private let findSuggestions: @MainActor (String) async -> [String]
 
     /// Coalesces a burst of keystrokes into the lookup for the word they settle on.
     private static let debounce = Duration.milliseconds(90)
+
+    init(
+        findEntry: @escaping @Sendable (String, DictionaryScope) async -> DictionaryEntry? = { term, scope in
+            await Task.detached(priority: .userInitiated) {
+                DictionaryService.entry(for: term, in: scope)
+            }.value
+        },
+        findSuggestions: @escaping @MainActor (String) async -> [String] =
+            DictionarySuggestionService.words
+    ) {
+        self.findEntry = findEntry
+        self.findSuggestions = findSuggestions
+    }
 
     /// Dictionary.app's list can change between visits, so each one reads it afresh.
     func refreshScopes() {
@@ -45,14 +62,16 @@ final class DictionarySession {
             return
         }
         let scope = scope
+        let findEntry = findEntry
+        let findSuggestions = findSuggestions
         task = Task { [weak self] in
             try? await Task.sleep(for: Self.debounce)
             guard !Task.isCancelled else { return }
-            let entry = await Task.detached(priority: .userInitiated) {
-                DictionaryService.entry(for: term, in: scope)
-            }.value
+            let entry = await findEntry(term, scope)
             guard !Task.isCancelled else { return }
-            self?.lookup = Lookup(term: term, scope: scope, entry: entry)
+            let suggestions = entry == nil ? await findSuggestions(term) : []
+            guard !Task.isCancelled, let self, self.term == term else { return }
+            lookup = Lookup(term: term, scope: scope, entry: entry, suggestions: suggestions)
         }
     }
 
