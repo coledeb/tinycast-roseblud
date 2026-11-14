@@ -1,0 +1,44 @@
+diff --git a/Tinycast/Features/Updates/Model/ReleaseFeed.swift b/Tinycast/Features/Updates/Model/ReleaseFeed.swift
+index d5c966bc7f851b04eb1432fceae728be50189e27..2c4b79dec2adf4f839ec9e1d330d93a6ff7d8fc1 100644
+--- a/Tinycast/Features/Updates/Model/ReleaseFeed.swift
++++ b/Tinycast/Features/Updates/Model/ReleaseFeed.swift
+@@ -11,7 +11,8 @@ struct AvailableRelease: Codable, Hashable, Sendable {
+ 
+ /// Nothing throws: an unusable body means nothing to install, and the pump retries.
+ enum ReleaseFeed {
+-    static let repository = "abue-ammar/tinycast"
++    // tinycast-space: this build updates from the fork, never from upstream.
++    static let repository = "sermelipharo/tinycast-space"
+ 
+     /// The only artifact with an x86_64 slice, so the only one an Intel Mac can install.
+     private static let universalMarker = "-Universal-"
+diff --git a/Tinycast/Windows/About/AboutView.swift b/Tinycast/Windows/About/AboutView.swift
+index 52dc67236d2b4d4376d48978a6cc5e84e8207f37..99a1a92ceac696aedce4290361a33190fedb84fc 100644
+--- a/Tinycast/Windows/About/AboutView.swift
++++ b/Tinycast/Windows/About/AboutView.swift
+@@ -56,6 +56,14 @@ struct AboutView: View {
+             VStack(spacing: Theme.Spacing.sm) {
+                 Text(Bundle.main.appDisplayName)
+                     .font(.title.weight(.bold))
++                // tinycast-space: the edition chip, styled like the version chip in the accent colour.
++                Text("✨ Space Edition")
++                    .font(.caption.weight(.semibold))
++                    .foregroundStyle(Color.accentColor)
++                    .padding(.horizontal, Theme.Spacing.md)
++                    .padding(.vertical, Theme.Spacing.xs / 2)
++                    .background(Capsule().fill(Color.accentColor.opacity(0.12)))
++                    .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1))
+                 Text(Self.version)
+                     .font(.caption.monospacedDigit())
+                     .foregroundStyle(.secondary)
+@@ -149,8 +157,8 @@ private struct AboutLink: Identifiable {
+             url: URL(string: "https://tinycast.dev/")!),
+         AboutLink(
+             id: "github", glyph: .brand("BrandGitHub"), title: "GitHub",
+-            detail: "github.com/abue-ammar/tinycast",
+-            url: URL(string: "https://github.com/abue-ammar/tinycast")!),
++            detail: "Tinycast Space Edition",
++            url: URL(string: "https://github.com/sermelipharo/tinycast-space")!),
+         AboutLink(
+             id: "discord", glyph: .brand("BrandDiscord"), title: "Discord",
+             detail: String(localized: "Join the Tinycast community"),

@@ -1,0 +1,33 @@
+diff --git a/Scripts/raycast-runtime/src/node-shims.js b/Scripts/raycast-runtime/src/node-shims.js
+index 61cafbeb6eeecf876a18caeb6e58d67f80beb84a..c5eb05b83af32ef4e62db00e66221cc37f6ce924 100644
+--- a/Scripts/raycast-runtime/src/node-shims.js
++++ b/Scripts/raycast-runtime/src/node-shims.js
+@@ -1620,11 +1620,26 @@ const querystring = {
+     return out;
+   },
+   stringify(object) {
++    // Node coerces anything but a string, finite number, bigint or boolean to "" — google-auth-library
++    // relies on it: a client without a secret sends `client_secret=`, never `client_secret=undefined`.
++    const coerce = (value) => {
++      switch (typeof value) {
++        case "string":
++          return value;
++        case "number":
++          return Number.isFinite(value) ? String(value) : "";
++        case "bigint":
++        case "boolean":
++          return String(value);
++        default:
++          return "";
++      }
++    };
+     const params = new URLSearchParams();
+     for (const key of Object.keys(object || {})) {
+       const value = object[key];
+-      if (Array.isArray(value)) for (const item of value) params.append(key, item);
+-      else params.append(key, value);
++      if (Array.isArray(value)) for (const item of value) params.append(key, coerce(item));
++      else params.append(key, coerce(value));
+     }
+     return params.toString();
+   },
