@@ -24,7 +24,7 @@ final class UpdateCheckStore {
     @ObservationIgnored var onUpdateAvailable: (@MainActor (AvailableRelease) -> Void)?
 
     private let fileURL: URL
-    @ObservationIgnored private let fetch: @Sendable () async -> Data?
+    @ObservationIgnored private let fetch: @Sendable () async throws -> Data
     private var installedVersion: AppVersion?
     private var checksInFlight = 0
     /// At most one uninvited appearance per version per launch.
@@ -36,7 +36,7 @@ final class UpdateCheckStore {
         runningVersion: AppVersion? = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)
             .flatMap(AppVersion.init),
         fileURL: URL = AppPaths.caches().appendingPathComponent("update-check.json"),
-        fetch: @escaping @Sendable () async -> Data? = UpdateCheckStore.body
+        fetch: @escaping @Sendable () async throws -> Data = UpdateCheckStore.body
     ) {
         self.channel = channel
         self.runningVersion = runningVersion
@@ -77,17 +77,16 @@ final class UpdateCheckStore {
         pump = nil
     }
 
-    /// The manual path: ignores freshness, and reports whether GitHub actually answered.
-    @discardableResult
-    func check() async -> Bool {
-        guard channel.updatesItself else { return false }
+    /// The manual path: ignores freshness, and throws why GitHub did not answer.
+    func check() async throws {
+        guard channel.updatesItself else { return }
         checksInFlight += 1
         defer { checksInFlight -= 1 }
-        guard let data = await fetch(), !Task.isCancelled else { return false }
+        let data = try await fetch()
+        try Task.checkCancellation()
         latest = ReleaseFeed.newest(from: data, channel: channel, architecture: .current)
         lastCheckedAt = Date()
         persist()
-        return true
     }
 
     func recordInstall(of version: AppVersion) {
@@ -115,7 +114,12 @@ final class UpdateCheckStore {
         let age = max(0, lastCheckedAt.map { Date().timeIntervalSince($0) } ?? .infinity)
         var wait = Self.refreshInterval - age
         if wait <= 0 {
-            wait = await check() ? Self.refreshInterval : Self.retryInterval
+            do {
+                try await check()
+                wait = Self.refreshInterval
+            } catch {
+                wait = Self.retryInterval
+            }
         }
         announce()
         return wait
@@ -148,15 +152,38 @@ final class UpdateCheckStore {
         return URLSession(configuration: config)
     }()
 
-    private nonisolated static func body() async -> Data? {
+    private nonisolated static func body() async throws -> Data {
         var request = URLRequest(url: endpoint, timeoutInterval: 20)
         // GitHub rejects an API request carrying no User-Agent outright.
         request.setValue("Tinycast", forHTTPHeaderField: "User-Agent")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        guard let (data, response) = try? await session.data(for: request),
-            let http = response as? HTTPURLResponse, http.statusCode == 200
-        else { return nil }
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw UpdateFailure.checkFailed(error.localizedDescription)
+        }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw failure(for: response as? HTTPURLResponse, body: data)
+        }
         return data
+    }
+
+    nonisolated static func failure(for response: HTTPURLResponse?, body: Data) -> UpdateFailure {
+        let status = response?.statusCode ?? 0
+        // Unauthenticated, the API allows 60 requests an hour per address, shared by the network.
+        let exhausted = response?.value(forHTTPHeaderField: "X-RateLimit-Remaining") == "0"
+        // A secondary limit answers 403 with quota left, flagged only by Retry-After or its message.
+        let secondary =
+            response?.value(forHTTPHeaderField: "Retry-After") != nil
+            || String(bytes: body, encoding: .utf8)?.localizedStandardContains("rate limit") == true
+        if status == 429 || (status == 403 && (exhausted || secondary)) {
+            return .checkFailed(String(localized: "GitHub is limiting requests from this network."))
+        }
+        return .checkFailed(String(localized: "The server answered \(status)."))
     }
 }
