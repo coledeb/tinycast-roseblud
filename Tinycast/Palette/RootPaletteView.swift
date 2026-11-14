@@ -26,6 +26,7 @@ struct RootPaletteView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.metrics) private var metrics
     @Environment(\.openURL) private var openURL
+    @AppStorage(SearchTextSize.key) private var searchTextSize = SearchTextSize.large  // tinycast-roseblud
     @FocusState private var searchFocused: Bool
     /// Kept apart from the search field's own focus. See docs/features/palette.md.
     @FocusState private var argumentFocused: String?
@@ -946,7 +947,7 @@ struct RootPaletteView: View {
 
     /// Capped to keep the strip on screen; empty, it measures the prompt so the strip follows it.
     private func searchFieldWidth(for accessory: PaletteHeaderAccessory) -> CGFloat {
-        let font = metrics.typography.searchFieldNSFont
+        let font = searchTextSize.nsFont(metrics)  // tinycast-roseblud
         let text = vm.query.isEmpty ? searchPrompt : vm.query
         let typed = (text as NSString).size(withAttributes: [.font: font]).width
         let chrome = metrics.size.headerIconSlot + metrics.spacing.md * 3 + metrics.spacing.xl
@@ -971,7 +972,7 @@ struct RootPaletteView: View {
         @Bindable var vm = vm
         return TextField("", text: $vm.query)
             .textFieldStyle(.plain)
-            .font(metrics.typography.searchField)
+            .font(searchTextSize.font(metrics))  // tinycast-roseblud
             .tint(Theme.Colors.textPrimary)
             .focused($searchFocused)
             // Fills the row's height, so there's no gap above it for topDragStrip to meet.
@@ -980,7 +981,7 @@ struct RootPaletteView: View {
                 // An IME's marked text leaves `query` empty, so the placeholder would overlap it.
                 if vm.query.isEmpty, !vm.isComposing {
                     Text(searchPrompt)
-                        .font(metrics.typography.searchField)
+                        .font(searchTextSize.font(metrics))  // tinycast-roseblud
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .lineLimit(1)
                         // Never a click target: tapping the placeholder must still land the caret.
