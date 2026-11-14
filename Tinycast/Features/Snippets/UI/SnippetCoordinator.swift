@@ -127,9 +127,14 @@ final class SnippetCoordinator {
         paletteCoordinator.togglePalette(mode: .snippets, seeding: query.isEmpty ? nil : query)
     }
 
-    func editSnippet(_ record: StoredSnippet?) {
+    func editSnippet(
+        _ record: StoredSnippet?, prefilledText: String? = nil, sourceClipboardID: UUID? = nil
+    ) {
         guard settings.snippetsEnabled else { return }
-        editor = SnippetEditorSession(record: record)
+        // Opened from ⌘K, the menu holds key; the palette has to take it back before it pushes.
+        (NSApp.keyWindow as? MenuPanel)?.parent?.makeKey()
+        editor = SnippetEditorSession(
+            record: record, prefilledText: prefilledText, sourceClipboardID: sourceClipboardID)
         paletteCoordinator.showPalette(mode: .snippetEditor)
     }
 
@@ -206,6 +211,11 @@ final class SnippetCoordinator {
         if !palette.pop(preservingSelection: true) {
             paletteCoordinator.hidePalette()
             palette.prepare(mode: .launcher)
+        } else if palette.mode == .clipboard, let sourceID = editor?.sourceClipboardID,
+            let index = clipboardStore.search(palette.query, filter: palette.clipboardFilter)
+                .firstIndex(where: { $0.id == sourceID })
+        {
+            palette.restoreSelection(index)
         }
         editor = nil
     }
