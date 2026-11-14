@@ -36,17 +36,18 @@ struct ClipboardList: View {
     private var rows: [Row] {
         var rows: [Row] = []
         var currentTitle: String?
-        var pinnedSlot = 0
         let buckets = DateBucket.Boundaries()
-        for item in results {
+        for (index, item) in results.enumerated() {
             let title =
                 item.isPinned ? String(localized: "Pinned") : buckets.bucket(for: item.createdAt).title
             if title != currentTitle {
                 rows.append(.header(title))
                 currentTitle = title
             }
-            let slot = item.isPinned ? FavoriteSlots.digit(at: pinnedSlot) : nil
-            if item.isPinned { pinnedSlot += 1 }
+            // tinycast-space: the pins lead, so the unpinned rows below carry the numbering on.
+            let slot =
+                ClipboardStore.isNumbered(row: index, pinned: item.isPinned)
+                ? FavoriteSlots.digit(at: index) : nil
             rows.append(.item(item, slot: slot))
         }
         return rows
