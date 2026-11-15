@@ -84,9 +84,13 @@ the header row. It cannot reuse `ExtensionToastPill`, because extension views st
 | ----------------------------- | -------------- | ----------- |
 | `com.abueammar.tinycast`      | `.stable`      | releases    |
 | `com.abueammar.tinycast.beta` | `.beta`        | prereleases |
+| `com.tinycast.app`            | `.stable`      | releases    |
 | anything else                 | `.development` | nothing     |
 
-Until 2027-05-13 each release also carries a `-Handoff` zip, listed before its own, for copies from
+Roseblud releases retain `com.tinycast.app` and use the regular release zip, with the same bundle-id
+and signature checks as every other stable build. Development and unknown bundle ids never update.
+
+Until 2027-05-13 each upstream release also carries a `-Handoff` zip, listed before its own, for copies from
 before the bundle id moved from `com.tinycast.app`. Those copies refuse any other bundle id and take
 the first zip, so the handoff wears their id and carries this app inside; `ReleaseFeed` never offers it
 to a copy that has moved. See [migrations.md](../migrations.md) and

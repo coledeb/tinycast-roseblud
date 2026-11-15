@@ -109,11 +109,15 @@ struct UpdatesTests {
         expect(dev == .development, "the dev bundle id is a local build")
         expect(ReleaseChannel(bundleID: nil) == .development, "a missing bundle id never updates")
         expect(
-            ReleaseChannel(bundleID: "com.tinycast.app") == .development,
-            "the bundle id from before the move is no channel of this build")
+            ReleaseChannel(bundleID: "com.tinycast.app") == .stable,
+            "the Roseblud release bundle id receives stable updates")
 
         expect(stable.updatesItself && beta.updatesItself, "both shipped channels update")
         expect(!dev.updatesItself, "a local build does not update itself")
+        expect(ReleaseChannel(bundleID: "com.tinycast.app.dev") == .development,
+            "the legacy dev bundle id never updates")
+        expect(ReleaseChannel(bundleID: "unknown.app") == .development,
+            "an unknown bundle id never updates")
 
         expect(stable.accepts(prerelease: false), "stable takes releases")
         expect(!stable.accepts(prerelease: true), "stable never crosses to a prerelease")
