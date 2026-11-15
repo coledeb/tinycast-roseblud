@@ -12,7 +12,7 @@ struct AvailableRelease: Codable, Hashable, Sendable {
 /// Nothing throws: an unusable body means nothing to install, and the pump retries.
 enum ReleaseFeed {
     // tinycast-space: this build updates from the fork, never from upstream.
-    static let repository = "sermelipharo/tinycast-space"
+    static let repository = "coledeb/tinycast-roseblud"
 
     /// The only artifact with an x86_64 slice, so the only one an Intel Mac can install.
     private static let universalMarker = "-Universal-"

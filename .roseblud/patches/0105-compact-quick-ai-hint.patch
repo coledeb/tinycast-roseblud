@@ -1,0 +1,81 @@
+diff --git a/Tinycast/Features/Launcher/UI/CompactBarRevealFade.swift b/Tinycast/Features/Launcher/UI/CompactBarRevealFade.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..eca9632f9ce2e59e16e1fd7c430754ca3f9787a4
+--- /dev/null
++++ b/Tinycast/Features/Launcher/UI/CompactBarRevealFade.swift
+@@ -0,0 +1,36 @@
++import SwiftUI
++
++private typealias BarMotion = Theme.CompactBarMotion
++
++/// tinycast-roseblud: fades in with the compact bar's first glyph, once the capsule has settled.
++struct CompactBarRevealFade: ViewModifier {
++    let isActive: Bool
++    @Environment(PaletteState.self) private var palette
++    @Environment(\.accessibilityReduceMotion) private var reduceMotion
++    @State private var isRevealed = false
++
++    func body(content: Content) -> some View {
++        let shown = !isActive || isRevealed
++        content
++            // Only the way in fades; collapsing back from a query must hide it at once.
++            .animation(reduceMotion || !isRevealed ? nil : fade) {
++                $0.opacity(shown ? 1 : 0).blur(radius: shown ? 0 : BarMotion.glyphBlur)
++            }
++            .task(id: palette.isVisible && isActive) { await followBar() }
++    }
++
++    private var fade: Animation {
++        .easeOut(duration: BarMotion.glyphFade).delay(BarMotion.revealDelay + BarMotion.glyphDelay)
++    }
++
++    /// Mirrors `CompactBar`, which remounts and replays its reveal whenever the window collapses.
++    private func followBar() async {
++        if palette.isVisible {
++            withTransaction(\.disablesAnimations, !isActive) { isRevealed = isActive }
++            return
++        }
++        try? await Task.sleep(for: .seconds(Motion.duration(BarMotion.parkAfterHide)))
++        guard !Task.isCancelled else { return }
++        withTransaction(\.disablesAnimations, true) { isRevealed = false }
++    }
++}
+diff --git a/Tinycast/Palette/RootPaletteView.swift b/Tinycast/Palette/RootPaletteView.swift
+index 489fccd4a1de0494b3018d44f13161c8a5735fcb..895c604fe5a7fad44735e087998686e8fd7ba010 100644
+--- a/Tinycast/Palette/RootPaletteView.swift
++++ b/Tinycast/Palette/RootPaletteView.swift
+@@ -817,7 +817,8 @@ struct RootPaletteView: View {
+             }
+             if tabOpensChat {
+                 headerGutter(width: metrics.spacing.md)
+-                quickAITabHint
++                quickAITabHint  // tinycast-roseblud
++                    .modifier(CompactBarRevealFade(isActive: isCollapsed && !compactCommands.isEmpty))
+             }
+             if !isCollapsed, vm.mode == .clipboard {
+                 headerGutter(width: metrics.spacing.md)
+@@ -913,7 +914,8 @@ struct RootPaletteView: View {
+ 
+     /// Resolved through `PaletteTabAction`, so the hint cannot promise the wrong destination.
+     private var tabOpensChat: Bool {
+-        guard !isCollapsed, headerAccessory?.fieldNames.isEmpty ?? true else { return false }
++        // tinycast-roseblud: the compact bar shows it too, since Tab asks Quick AI there as well.
++        guard headerAccessory?.fieldNames.isEmpty ?? true else { return false }
+         return PaletteTabAction.resolve(
+             mode: vm.mode, aiEnabled: settings.aiEnabled,
+             clipboardEnabled: settings.clipboardEnabled) == .ask
+diff --git a/docs/features/palette.md b/docs/features/palette.md
+index 0e965334be664c96ccfadc804f1dfa31e64dd4ce..e749252f9e9b7eae7039eee0d3f1e6e24d51341a 100644
+--- a/docs/features/palette.md
++++ b/docs/features/palette.md
+@@ -182,7 +182,9 @@ Appearance, `SearchTextSize` in the plain `rosebludSearchTextSize` default): *La
+ Interface Size; the header height does not change, so the text only sits smaller in the same bar.
+ `searchFieldWidth(for:)` measures with the same font, so a header accessory still follows the prompt.
+ 
+-The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap.
++The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap, in the
++compact bar as well as the full window. Beside compact shortcuts, `CompactBarRevealFade` holds it back
++until the capsule has settled, then fades it in with the first button's glyph.
+ It is drawn only when Tab really would open Quick AI, a condition read
+ back out of `PaletteTabAction` rather than restated, so a hint can never promise a destination the
+ key does not go to: an argument field to walk takes Tab first, and the hint steps aside for it.

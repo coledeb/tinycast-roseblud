@@ -1,0 +1,54 @@
+diff --git a/Tests/UpdatesTests.swift b/Tests/UpdatesTests.swift
+index 6647bc9f751bdf60f9c529090d710949de4941bf..d12133a40d392873831de47a83897ab74916ab55 100644
+--- a/Tests/UpdatesTests.swift
++++ b/Tests/UpdatesTests.swift
+@@ -109,11 +109,15 @@ struct UpdatesTests {
+         expect(dev == .development, "the dev bundle id is a local build")
+         expect(ReleaseChannel(bundleID: nil) == .development, "a missing bundle id never updates")
+         expect(
+-            ReleaseChannel(bundleID: "com.tinycast.app") == .development,
+-            "the bundle id from before the move is no channel of this build")
++            ReleaseChannel(bundleID: "com.tinycast.app") == .stable,
++            "the Roseblud release bundle id receives stable updates")
+ 
+         expect(stable.updatesItself && beta.updatesItself, "both shipped channels update")
+         expect(!dev.updatesItself, "a local build does not update itself")
++        expect(ReleaseChannel(bundleID: "com.tinycast.app.dev") == .development,
++            "the legacy dev bundle id never updates")
++        expect(ReleaseChannel(bundleID: "unknown.app") == .development,
++            "an unknown bundle id never updates")
+ 
+         expect(stable.accepts(prerelease: false), "stable takes releases")
+         expect(!stable.accepts(prerelease: true), "stable never crosses to a prerelease")
+diff --git a/Tinycast/Features/Updates/Model/ReleaseChannel.swift b/Tinycast/Features/Updates/Model/ReleaseChannel.swift
+index fb06c317ec3b4938b442e3731603a4e79f460db8..4dcc7fe401d157663cef50d3affb46928821a831 100644
+--- a/Tinycast/Features/Updates/Model/ReleaseChannel.swift
++++ b/Tinycast/Features/Updates/Model/ReleaseChannel.swift
+@@ -9,7 +9,7 @@ enum ReleaseChannel: Sendable {
+ 
+     init(bundleID: String?) {
+         switch bundleID {
+-        case "com.abueammar.tinycast": self = .stable
++        case "com.abueammar.tinycast", "com.tinycast.app": self = .stable
+         case "com.abueammar.tinycast.beta": self = .beta
+         default: self = .development
+         }
+diff --git a/docs/features/updates.md b/docs/features/updates.md
+index d13f2f7a306c836583edd2c5f90eb4dc73d1fd16..b63287349da4b95e6cbc1e85b7aae58d687d2ac1 100644
+--- a/docs/features/updates.md
++++ b/docs/features/updates.md
+@@ -84,9 +84,13 @@ the header row. It cannot reuse `ExtensionToastPill`, because extension views st
+ | ----------------------------- | -------------- | ----------- |
+ | `com.abueammar.tinycast`      | `.stable`      | releases    |
+ | `com.abueammar.tinycast.beta` | `.beta`        | prereleases |
++| `com.tinycast.app`            | `.stable`      | releases    |
+ | anything else                 | `.development` | nothing     |
+ 
+-Until 2027-05-13 each release also carries a `-Handoff` zip, listed before its own, for copies from
++Roseblud releases retain `com.tinycast.app` and use the regular release zip, with the same bundle-id
++and signature checks as every other stable build. Development and unknown bundle ids never update.
++
++Until 2027-05-13 each upstream release also carries a `-Handoff` zip, listed before its own, for copies from
+ before the bundle id moved from `com.tinycast.app`. Those copies refuse any other bundle id and take
+ the first zip, so the handoff wears their id and carries this app inside; `ReleaseFeed` never offers it
+ to a copy that has moved. See [migrations.md](../migrations.md) and
