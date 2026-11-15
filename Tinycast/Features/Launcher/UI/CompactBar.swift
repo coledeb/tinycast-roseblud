@@ -61,6 +61,7 @@ struct CompactBar: View {
             }
         }
         .overlay { scrim(geometry: geometry, revealed: revealed) }
+        .overlay { CompactBarBackdrop(commands: commands, selection: selection, geometry: geometry, revealed: revealed) }
         // Above the glass rather than inside it, where a morph would smear them.
         .overlay(alignment: .topLeading) {
             ForEach(Array(commands.enumerated()), id: \.element) { index, command in
