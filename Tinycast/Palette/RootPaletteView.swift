@@ -817,7 +817,8 @@ struct RootPaletteView: View {
             }
             if tabOpensChat {
                 headerGutter(width: metrics.spacing.md)
-                quickAITabHint
+                quickAITabHint  // tinycast-roseblud
+                    .modifier(CompactBarRevealFade(isActive: isCollapsed && !compactCommands.isEmpty))
             }
             if !isCollapsed, vm.mode == .clipboard {
                 headerGutter(width: metrics.spacing.md)
@@ -913,7 +914,8 @@ struct RootPaletteView: View {
 
     /// Resolved through `PaletteTabAction`, so the hint cannot promise the wrong destination.
     private var tabOpensChat: Bool {
-        guard !isCollapsed, headerAccessory?.fieldNames.isEmpty ?? true else { return false }
+        // tinycast-roseblud: the compact bar shows it too, since Tab asks Quick AI there as well.
+        guard headerAccessory?.fieldNames.isEmpty ?? true else { return false }
         return PaletteTabAction.resolve(
             mode: vm.mode, aiEnabled: settings.aiEnabled,
             clipboardEnabled: settings.clipboardEnabled) == .ask

@@ -182,7 +182,9 @@ Appearance, `SearchTextSize` in the plain `rosebludSearchTextSize` default): *La
 Interface Size; the header height does not change, so the text only sits smaller in the same bar.
 `searchFieldWidth(for:)` measures with the same font, so a header accessory still follows the prompt.
 
-The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap.
+The launcher advertises the first hop in the header — `Quick AI` beside a ⇥ key cap, in the
+compact bar as well as the full window. Beside compact shortcuts, `CompactBarRevealFade` holds it back
+until the capsule has settled, then fades it in with the first button's glyph.
 It is drawn only when Tab really would open Quick AI, a condition read
 back out of `PaletteTabAction` rather than restated, so a hint can never promise a destination the
 key does not go to: an argument field to walk takes Tab first, and the hint steps aside for it.
