@@ -30,6 +30,7 @@ final class DictationCoordinator {
     @ObservationIgnored private var pendingStartCue: UUID?
     @ObservationIgnored private var finishWhenStarted = false
     @ObservationIgnored private var target: InjectionTarget?
+    @ObservationIgnored private let streaming = DictationStreaming()
     /// The field a mic button is dictating into; nil for a shortcut's session.
     private(set) var field: DictationField?
 
@@ -122,7 +123,7 @@ final class DictationCoordinator {
     }
 
     var isEnabled: Bool { settings.dictationEnabled }
-    var hasModel: Bool { models.isInstalled(settings.dictationModel) }
+    var hasModel: Bool { usesAppleSpeech || models.isInstalled(settings.dictationModel) }
 
     /// A field's own mic: click to start and click to finish, whatever the shortcut's mode or focus.
     func toggle(into editor: any InjectableTextView) {
@@ -144,7 +145,7 @@ final class DictationCoordinator {
     }
 
     private func begin(target: InjectionTarget?) {
-        guard models.isInstalled(settings.dictationModel) else {
+        guard usesAppleSpeech || models.isInstalled(settings.dictationModel) else {
             field = nil
             showMessage(String(localized: "Download the dictation model in Settings first"), .danger)
             return
@@ -156,6 +157,7 @@ final class DictationCoordinator {
         liveOffset = 0
         liveText = ""
         self.target = target
+        beginStreaming(token: current)
         pendingStartCue = settings.dictationPlaysSounds ? current : nil
         if pendingStartCue == nil { audioDucker.begin() }
         startTask = Task { [weak self] in
@@ -210,6 +212,7 @@ final class DictationCoordinator {
         } else {
             audioDucker.end()
         }
+        if streaming.isApple { return acceptStreamed() }
         // A cancelled chunk keeps its audio: the final pass starts at liveOffset, losing nothing.
         let pendingLive = liveTask
         liveTask = nil
@@ -306,7 +309,7 @@ final class DictationCoordinator {
     }
 
     private func startLiveInsertion(token current: UUID) {
-        guard insertionPastes, settings.dictationLiveInsertion else { return }
+        guard !streaming.isApple, insertionPastes, settings.dictationLiveInsertion else { return }
         liveTask = Task { [weak self] in
             guard let self else { return }
             while !Task.isCancelled {
@@ -405,6 +408,7 @@ final class DictationCoordinator {
         target = nil
         field = nil
         panel.close()
+        streaming.end()
         audioDucker.end()
     }
 }
@@ -413,4 +417,101 @@ final class DictationCoordinator {
 struct DictationField: Equatable {
     let editor: ObjectIdentifier
     var isTranscribing = false
+}
+
+// tinycast-roseblud: Apple's streaming recognizer and the live transcript bubble.
+extension DictationCoordinator {
+    /// Read when a session begins, so changing the engine mid-dictation never splits one.
+    var usesAppleSpeech: Bool { DictationStreaming.usesAppleSpeech }
+
+    fileprivate func beginStreaming(token current: UUID) {
+        streaming.begin(
+            apple: usesAppleSpeech, capture: capture,
+            onResult: { [weak self] text, isFinal in
+                self?.appleSpeechResult(text, isFinal: isFinal, token: current)
+            },
+            onFailure: { [weak self] error in
+                guard let self, token == current else { return }
+                cancel()
+                showMessage(error.localizedDescription, .danger)
+            })
+    }
+
+    private func appleSpeechResult(_ text: String, isFinal: Bool, token current: UUID) {
+        guard token == current, phase != .idle, phase != .stopping else { return }
+        streaming.apply(text, isFinal: isFinal)
+        // Only settled text is pasted: a pasted guess could never be taken back out of another app.
+        guard isFinal, phase == .listening, insertionPastes, settings.dictationLiveInsertion else { return }
+        let settled = streaming.takeSettled()
+        let text = DictationTextFormatter.format(
+            settled, context: insertionContext(), adaptCapitalization: settings.dictationAdaptsCapitalization)
+        guard !text.isEmpty else { return }
+        liveText += text
+        injector.deliver(
+            InjectedText(text), target: target, expectedKeyword: nil,
+            keywordLength: 0, automaticGeneration: nil,
+            isValid: { [weak self] in self?.token == current },
+            onDelivered: {},
+            onFailed: { [weak self] in
+                guard let self, token == current else { return }
+                liveDeliveryFailed = true
+            })
+    }
+
+    fileprivate func acceptStreamed() {
+        let current = token
+        transcriptionTask = Task { [weak self] in
+            guard let self else { return }
+            _ = await capture.stop()
+            await streaming.finish()
+            if !liveText.isEmpty { await injector.drain() }
+            guard token == current else { return }
+            let destination = field == nil ? settings.dictationDestination : .paste
+            let remainder = streaming.takeSettled()
+            guard !remainder.isEmpty else {
+                if liveText.isEmpty {
+                    reset(cancelTranscription: false)
+                    showMessage(String(localized: "No speech was recorded"), .danger)
+                } else {
+                    finishWithoutRemainder(destination)
+                }
+                return
+            }
+            let context = destination.pastes ? insertionContext() : nil
+            let text = DictationTextFormatter.format(
+                remainder, context: context, adaptCapitalization: settings.dictationAdaptsCapitalization)
+            deliverFinal(text, destination: destination, token: current)
+        }
+    }
+
+    /// The same delivery as `accept()`'s, for text that needs no final transcription pass.
+    private func deliverFinal(_ text: String, destination: DictationDestination, token current: UUID) {
+        let assembled = liveText + text
+        panel.close()
+        streaming.closeBubble()
+        guard destination.pastes else {
+            Paster.copyPlainText(text)
+            reset(cancelTranscription: false)
+            return
+        }
+        injector.deliver(
+            InjectedText(text), target: target, expectedKeyword: nil,
+            keywordLength: 0, automaticGeneration: nil,
+            isValid: { [weak self] in self?.token == current },
+            onDelivered: { [weak self] in
+                guard let self, token == current else { return }
+                let lost = liveDeliveryFailed
+                if destination.copies { Paster.copyPlainText(assembled) }
+                reset(cancelTranscription: false)
+                if lost {
+                    showMessage(String(localized: "Couldn't paste some dictation into this app"), .danger)
+                }
+            },
+            onFailed: { [weak self] in
+                guard let self, token == current else { return }
+                reset(cancelTranscription: false)
+                if destination.copies { Paster.copyPlainText(assembled) }
+                showMessage(String(localized: "Couldn't paste dictation into this app"), .danger)
+            })
+    }
 }

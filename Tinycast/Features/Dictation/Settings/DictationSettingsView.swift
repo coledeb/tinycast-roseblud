@@ -8,6 +8,7 @@ struct DictationSettingsView: View {
     @State private var microphones: [AVCaptureDevice] = []
     @State private var modelSize: Int64?
     @State private var microphoneAccess = Permissions.microphoneAccess()
+    @AppStorage(DictationAppleSpeech.engineKey) private var recognizer = ""
     var body: some View {
         @Bindable var settings = settings
         return Form {
@@ -83,6 +84,8 @@ struct DictationSettingsView: View {
                     SettingsSectionHeader(.dictationCommands)
                 }
 
+                DictationAppleSpeechSection()
+
                 Section {
                     Picker(selection: familyBinding) {
                         ForEach(DictationModel.Family.allCases) { family in
@@ -144,6 +147,7 @@ struct DictationSettingsView: View {
                 } header: {
                     SettingsSectionHeader(.dictationModel)
                 }
+                .disabled(recognizer == "apple")
 
                 Section {
                     Picker(selection: $settings.dictationIdleRelease) {

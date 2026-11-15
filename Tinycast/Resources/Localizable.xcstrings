@@ -23956,6 +23956,58 @@
         }
       }
     },
+    "Apple's speech recognition doesn't support your system language." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apples Spracherkennung unterstützt deine Systemsprache nicht."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El reconocimiento de voz de Apple no admite el idioma del sistema."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La reconnaissance vocale d’Apple ne prend pas en charge la langue de votre système."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appleの音声認識はシステムの言語に対応していません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 음성 인식은 시스템 언어를 지원하지 않습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O reconhecimento de fala da Apple não suporta o idioma do sistema."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Распознавание речи Apple не поддерживает язык системы."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 语音识别不支持你的系统语言。"
+          }
+        }
+      }
+    },
     "Apple's translator does not support this language pair." : {
       "localizations" : {
         "de" : {
@@ -28983,6 +29035,58 @@
         }
       }
     },
+    "Built into macOS: nothing to download, words appear as you speak." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In macOS integriert: kein Download nötig, Wörter erscheinen beim Sprechen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Integrado en macOS: no hay nada que descargar y las palabras aparecen mientras hablas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intégré à macOS : rien à télécharger, les mots s’affichent pendant que vous parlez."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOSに内蔵：ダウンロード不要で、話すそばから文字が表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS에 내장: 다운로드할 필요 없이 말하는 대로 단어가 표시됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Integrado no macOS: nada para baixar, as palavras aparecem enquanto você fala."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Встроено в macOS: ничего не нужно загружать, слова появляются по мере речи."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内置于 macOS：无需下载，边说边显示文字。"
+          }
+        }
+      }
+    },
     "Built once, then kept current as files change. Indexing uses extra memory only while it runs." : {
       "localizations" : {
         "de" : {
@@ -32814,6 +32918,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在检查 %@…"
+          }
+        }
+      }
+    },
+    "Checking Apple's speech model…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apples Sprachmodell wird geprüft …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprobando el modelo de voz de Apple…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification du modèle vocal d’Apple…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appleの音声モデルを確認中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 음성 모델 확인 중…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verificando o modelo de fala da Apple…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка речевой модели Apple…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查 Apple 语音模型…"
           }
         }
       }
@@ -42628,6 +42784,58 @@
         }
       }
     },
+    "Couldn't start Apple's speech recognition." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apples Spracherkennung konnte nicht gestartet werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido iniciar el reconocimiento de voz de Apple."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de démarrer la reconnaissance vocale d’Apple."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appleの音声認識を開始できませんでした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 음성 인식을 시작할 수 없습니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível iniciar o reconhecimento de fala da Apple."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось запустить распознавание речи Apple."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法启动 Apple 语音识别。"
+          }
+        }
+      }
+    },
     "Couldn't start recording from this microphone." : {
       "localizations" : {
         "de" : {
@@ -47689,6 +47897,58 @@
         }
       }
     },
+    "Dictation transcript" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diktat-Transkript"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcripción del dictado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription de la dictée"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声入力の書き起こし"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "받아쓰기 텍스트"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcrição do ditado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расшифровка диктовки"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "听写文本"
+          }
+        }
+      }
+    },
     "Dictionary" : {
       "localizations" : {
         "de" : {
@@ -48997,6 +49257,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请先下载所选的听写模型。"
+          }
+        }
+      }
+    },
+    "Downloaded model" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geladenes Modell"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelo descargado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèle téléchargé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード済みモデル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드한 모델"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelo baixado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загруженная модель"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下载的模型"
           }
         }
       }
@@ -66697,6 +67009,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用此模型前，请先安装 %@。"
+          }
+        }
+      }
+    },
+    "Install Apple's speech model in Dictation settings first." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installiere zuerst Apples Sprachmodell in den Diktat-Einstellungen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primero instala el modelo de voz de Apple en los ajustes de Dictado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installez d’abord le modèle vocal d’Apple dans les réglages de Dictée."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に音声入力の設定でAppleの音声モデルをインストールしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "먼저 받아쓰기 설정에서 Apple 음성 모델을 설치하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instale primeiro o modelo de fala da Apple nos ajustes de Ditado."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сначала установите речевую модель Apple в настройках диктовки."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先在听写设置中安装 Apple 语音模型。"
           }
         }
       }
@@ -91580,6 +91944,58 @@
         }
       }
     },
+    "Parakeet or Qwen, chosen below." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parakeet oder Qwen, unten ausgewählt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parakeet o Qwen, elegido abajo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parakeet ou Qwen, choisi ci-dessous."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ParakeetまたはQwen（下で選択）。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parakeet 또는 Qwen(아래에서 선택)."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parakeet ou Qwen, escolhido abaixo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parakeet или Qwen, выбранная ниже."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parakeet 或 Qwen，在下方选择。"
+          }
+        }
+      }
+    },
     "Part of macOS and protected by the system." : {
       "localizations" : {
         "de" : {
@@ -98916,6 +99332,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空闲时在这台 Mac 上识别。"
+          }
+        }
+      }
+    },
+    "Recognizer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erkennung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconocedor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moteur de reconnaissance"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "認識エンジン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "인식 엔진"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconhecedor"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Распознаватель"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别引擎"
           }
         }
       }
@@ -111961,6 +112429,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在启动器中显示布局"
+          }
+        }
+      }
+    },
+    "Show live transcript" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live-Transkript anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar transcripción en directo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher la transcription en direct"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブ書き起こしを表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "실시간 텍스트 표시"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar transcrição ao vivo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показывать текст в реальном времени"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示实时文本"
           }
         }
       }
@@ -138168,6 +138688,58 @@
         }
       }
     },
+    "Words appear above the microphone as you speak." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wörter erscheinen beim Sprechen über dem Mikrofon."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las palabras aparecen sobre el micrófono mientras hablas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les mots s’affichent au-dessus du micro pendant que vous parlez."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話すそばから、マイクの上に文字が表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말하는 대로 마이크 위에 단어가 표시됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As palavras aparecem acima do microfone enquanto você fala."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Слова появляются над микрофоном по мере речи."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "说话时，文字会显示在麦克风上方。"
+          }
+        }
+      }
+    },
     "Working…" : {
       "localizations" : {
         "de" : {
@@ -138893,6 +139465,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 Codex 配置中已有名为“%@”的 MCP 服务器。请将其重命名，以便在 Codex 中使用此 Tinycast 服务器。"
+          }
+        }
+      }
+    },
+    "Your system language isn't supported" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Systemsprache wird nicht unterstützt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El idioma del sistema no es compatible"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La langue de votre système n’est pas prise en charge"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システムの言語は対応していません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 언어가 지원되지 않음"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O idioma do sistema não é suportado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Язык системы не поддерживается"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不支持你的系统语言"
           }
         }
       }
