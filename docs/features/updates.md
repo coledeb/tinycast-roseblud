@@ -86,6 +86,9 @@ the header row. It cannot reuse `ExtensionToastPill`, because extension views st
 | `com.abueammar.tinycast.beta` | `.beta`        | prereleases |
 | anything else                 | `.development` | nothing     |
 
+Roseblud releases retain `com.tinycast.app` and use the regular release zip, with the same bundle-id
+and signature checks as every other stable build. Development and unknown bundle ids never update.
+
 `AppVersion` parses `MAJOR.MINOR.PATCH` and `MAJOR.MINOR.PATCH-beta.N` with semver precedence: a
 prerelease sorts below the release it leads to, and `beta.10` above `beta.9`. Everything else parses
 to nil, so an off-shape tag can never be offered as an update. A release whose tag disagrees with
