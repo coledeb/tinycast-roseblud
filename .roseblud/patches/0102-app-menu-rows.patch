@@ -1,0 +1,45 @@
+diff --git a/Tinycast/Palette/RootPaletteView.swift b/Tinycast/Palette/RootPaletteView.swift
+index 1a48d46245d9e9bc1d606e7cad2275216e9abc51..3bf460de9432361cf9e3651b98b993c216180e59 100644
+--- a/Tinycast/Palette/RootPaletteView.swift
++++ b/Tinycast/Palette/RootPaletteView.swift
+@@ -276,6 +276,8 @@ struct RootPaletteView: View {
+             let filtered = appMenuContent.matching(ActionMenuSearchQuery(vm.menuQuery))
+             return PaletteMenuContent(
+                 popover: filtered.content, selection: $menuSelection,
++                // tinycast-roseblud: fit every row; the spare one covers both separators.
++                visibleRows: CGFloat(filtered.content.items.count + 1),
+                 search: PopoverMenu.Search(
+                     placeholder: String(localized: "Search for actions…"), placement: .bottom),
+                 onActivate: activateMenuItem, preferredSelection: filtered.bestMatch)
+diff --git a/docs/features/palette.md b/docs/features/palette.md
+index cebd3f50d245521f94e0abadf0c9dc8c32254e43..44d9c4934b74abe9512aefe418e55c9864d169e4 100644
+--- a/docs/features/palette.md
++++ b/docs/features/palette.md
+@@ -525,8 +525,8 @@ sizing, but the separator takes no selection index, so navigation still walks on
+ taller than its default cap ends its viewport mid-row, so the fold never lands on a separator or section
+ title, and both hairlines are one device pixel.
+ The app menu groups Check for Updates and Changelog, About and Support, then Settings and Quit,
+-under the version header. It shares the default five-and-a-half-row cap, so it opens at the Actions
+-menu's height with Settings partially visible; scrolling or keyboard navigation reveals the rest.
++under the version header. It grows to fit every row and both separators, so Quit sits fully above the
++search band without scrolling.
+ Built-in action menus mark boundaries between opening or copying, managing the item, settings, and
+ deletion. Menus offering one kind of action, such as calculator copies, color formats, or emoji
+ transfers, keep their rows in one group.
+diff --git a/docs/testing.md b/docs/testing.md
+index 73076fb3129a8f39b6b266ddaab4e12a42b467f1..8727143fbf62c544dd95a7f94e7766c094e7ff52 100644
+--- a/docs/testing.md
++++ b/docs/testing.md
+@@ -487,9 +487,9 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
+   move the menu highlight. Escape clears a non-empty query, then closes the menu on the next press
+ - The bottom-left app menu also searches from its bottom band; every header menu (including Emoji
+   categories, File Search filters and extension dropdowns) searches from its top band
+-- The app menu opens at the ⌘K Actions menu's height with Check for Updates and Changelog, a
+-  separator, About and Support, a separator, then Settings partially visible; Settings and Quit
+-  scroll fully into view with the pointer or arrow keys. Filtering to fewer rows shrinks the menu
++- The app menu opens with Check for Updates and Changelog, a separator, About and Support, a
++  separator, then Settings and Quit, all fully visible without scrolling. Filtering to fewer rows
++  shrinks the menu
+ - A long menu opens with unchanged row insets; while scrolling, rows can reach the panel edges
+ - A click in the palette but outside its menu closes only the menu; a click outside the palette
+   closes both, regardless of the menu query; the next summon accepts typing immediately

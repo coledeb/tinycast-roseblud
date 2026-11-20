@@ -1,0 +1,790 @@
+diff --git a/Scripts/run-tests.sh b/Scripts/run-tests.sh
+index 409bd85533030d69165430634b90064cffc744cd..922f359c2e8aa589af18037bf74b6994f57d4ba4 100755
+--- a/Scripts/run-tests.sh
++++ b/Scripts/run-tests.sh
+@@ -357,6 +357,7 @@ run CompactBarTests        Tinycast/Features/Launcher/Model/CompactBarSelection.
+                            Tinycast/Platform/LocalizedResource.swift \
+                            Tinycast/DesignSystem/IconTint.swift
+ run FallbackTests          Tinycast/Features/Launcher/Model/Fallback.swift \
++                           Tinycast/Features/Launcher/Model/TerminalChoice.swift \
+                            Tinycast/Features/Launcher/Model/CommandID.swift \
+                            Tinycast/Features/HotKeys/Model/HotKeyAction.swift \
+                            Tinycast/Features/QuickActions/Model/QuickAction.swift \
+diff --git a/Tests/HotKeyTests.swift b/Tests/HotKeyTests.swift
+index 00f2260c32e7b483f75f948b08eb27f92e36e605..bb0c01d2e61c671dd16454ed8502b39a9b764919 100644
+--- a/Tests/HotKeyTests.swift
++++ b/Tests/HotKeyTests.swift
+@@ -348,8 +348,8 @@ struct HotKeyTests {
+             "microphone and output mute can have independent hotkeys")
+         let unbindable = Set(CommandID.allCases.filter { $0.hotKeyAction == nil })
+         expect(
+-            unbindable == [.openInBrowser, .runShellCommand, .quit],
+-            "only the query-driven pair and Quit are unbindable — got \(unbindable.map(\.name))")
++            unbindable == [.openInBrowser, .runShellCommand, .runInTerminal, .quit],
++            "only the query-driven commands and Quit are unbindable — got \(unbindable.map(\.name))")
+         expect(
+             CommandID.allCases.allSatisfy {
+                 unbindable.contains($0) || $0.hotKeyAction == .command($0)
+diff --git a/Tinycast/Features/DeepLinks/Model/DeepLinkConsentPolicy.swift b/Tinycast/Features/DeepLinks/Model/DeepLinkConsentPolicy.swift
+index 22c322019d0637cbdb8fbbdc07d4d5f81169f2c0..f18b8af00aaf695a9c4b638769befa6334861289 100644
+--- a/Tinycast/Features/DeepLinks/Model/DeepLinkConsentPolicy.swift
++++ b/Tinycast/Features/DeepLinks/Model/DeepLinkConsentPolicy.swift
+@@ -46,7 +46,7 @@ enum DeepLinkConsentPolicy {
+         switch id {
+         case .fixGrammar, .rewrite, .translate, .summarize, .pasteSequentially, .openCamera,
+             .joinNextMeeting, .copyMeetingLink, .openInCalendar, .captureWindowLayout, .openInBrowser,
+-            .runShellCommand, .quit:
++            .runShellCommand, .runInTerminal, .quit:
+             true
+         case .quickAI, .aiChat, .calculatorHistory, .clipboardHistory, .searchEmoji, .searchFiles,
+             .searchMenuItems, .switchWindows, .switchWindowsBackwards, .createCustomCommand,
+diff --git a/Tinycast/Features/Launcher/Model/CommandID.swift b/Tinycast/Features/Launcher/Model/CommandID.swift
+index 86f3a4e58a967015b67becf989d32a7b865b4511..7aee07aa096d732c8652563698a643999172e55a 100644
+--- a/Tinycast/Features/Launcher/Model/CommandID.swift
++++ b/Tinycast/Features/Launcher/Model/CommandID.swift
+@@ -19,6 +19,7 @@ enum CommandID: String, CaseIterable, Sendable {
+     case openCamera = "command:open-camera"
+     case openInBrowser = "command:open-in-browser"
+     case runShellCommand = "command:run-shell-command"
++    case runInTerminal = "command:run-in-terminal"  // tinycast-roseblud
+     case createCustomCommand = "command:create-custom-command"
+     case searchCustomCommands = "command:search-custom-commands"
+     case define = "command:define"
+@@ -94,6 +95,7 @@ enum CommandID: String, CaseIterable, Sendable {
+         case .openCamera: return "Open Camera"
+         case .openInBrowser: return "Open in Browser"
+         case .runShellCommand: return "Run Shell Command"
++        case .runInTerminal: return "Run in Terminal"  // tinycast-roseblud
+         case .createCustomCommand: return "Create Custom Command"
+         case .searchCustomCommands: return "Search Custom Commands"
+         case .define: return "Define Word"
+@@ -143,7 +145,8 @@ enum CommandID: String, CaseIterable, Sendable {
+         case .switchWindows, .switchWindowsBackwards: return "macwindow.on.rectangle"
+         case .openCamera: return "camera.fill"
+         case .openInBrowser: return "globe"
+-        case .runShellCommand, .createCustomCommand, .searchCustomCommands: return "terminal.fill"
++        case .runShellCommand, .runInTerminal, .createCustomCommand, .searchCustomCommands:
++            return "terminal.fill"
+         case .define: return "book.closed.fill"
+         case .joinNextMeeting: return "video.fill"
+         case .mySchedule: return "calendar"
+@@ -185,7 +188,7 @@ enum CommandID: String, CaseIterable, Sendable {
+             .exportQuicklinks:
+             return .blue
+         case .searchMenuItems, .switchWindows, .switchWindowsBackwards, .runShellCommand,
+-            .createCustomCommand, .searchCustomCommands:
++            .runInTerminal, .createCustomCommand, .searchCustomCommands:
+             return .graphite
+         case .openCamera, .settings, .about: return .gray
+         case .define, .searchSnippets, .createSnippet: return .brown
+@@ -241,7 +244,7 @@ enum CommandID: String, CaseIterable, Sendable {
+ 
+     /// Query-driven: the typed text is their input, so they are built where offered, never listed.
+     var isQueryDriven: Bool {
+-        self == .openInBrowser || self == .runShellCommand
++        self == .openInBrowser || self == .runShellCommand || self == .runInTerminal
+     }
+ 
+     /// A chord carries no query, and none should be able to terminate the app outright.
+diff --git a/Tinycast/Features/Launcher/Model/Fallback.swift b/Tinycast/Features/Launcher/Model/Fallback.swift
+index c96fbc75057e88cb335a044153deeb0187324b06..91261b90cf4960796ae242c1d90f4411fcad27df 100644
+--- a/Tinycast/Features/Launcher/Model/Fallback.swift
++++ b/Tinycast/Features/Launcher/Model/Fallback.swift
+@@ -7,6 +7,7 @@ enum Fallback: Hashable, Sendable {
+         case quickAI
+         case searchFiles
+         case runShellCommand
++        case runInTerminal  // tinycast-roseblud
+         case define
+ 
+         /// Where its name and glyph come from, so a fallback row reads like the command it runs.
+@@ -15,6 +16,7 @@ enum Fallback: Hashable, Sendable {
+             case .quickAI: return .quickAI
+             case .searchFiles: return .searchFiles
+             case .runShellCommand: return .runShellCommand
++            case .runInTerminal: return .runInTerminal
+             case .define: return .define
+             }
+         }
+@@ -48,6 +50,7 @@ enum Fallback: Hashable, Sendable {
+         case .builtin(.quickAI): return String(localized: "Ask Quick AI")
+         case .builtin(.searchFiles): return String(localized: "Search Files")
+         case .builtin(.runShellCommand): return String(localized: "Run Shell Command")
++        case .builtin(.runInTerminal): return TerminalChoice.stored().runTitle
+         case .builtin(.define): return String(localized: "Define Word")
+         case .quicklink: return String(localized: "Open Quicklink")
+         }
+diff --git a/Tinycast/Features/Launcher/Model/TerminalChoice.swift b/Tinycast/Features/Launcher/Model/TerminalChoice.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..9583d69ce840de9341e62fb8a28eee34513c417a
+--- /dev/null
++++ b/Tinycast/Features/Launcher/Model/TerminalChoice.swift
+@@ -0,0 +1,71 @@
++import Foundation
++
++/// tinycast-roseblud: the app the Run in Terminal fallback hands its query to, each one a terminal
++/// whose AppleScript can open a window and type into its shell.
++enum TerminalChoice: String, CaseIterable, Identifiable, Sendable {
++    case terminal = "com.apple.Terminal"
++    case ghostty = "com.mitchellh.ghostty"
++    case iTerm = "com.googlecode.iterm2"
++
++    static let key = "rosebludFallbackTerminal"
++
++    /// An unset or unknown id reads as Terminal, which every Mac has.
++    static func stored(in defaults: UserDefaults = .standard) -> TerminalChoice {
++        defaults.string(forKey: key).flatMap(TerminalChoice.init) ?? .terminal
++    }
++
++    var id: String { rawValue }
++    var bundleID: String { rawValue }
++
++    var name: String {
++        switch self {
++        case .terminal: "Terminal"
++        case .ghostty: "Ghostty"
++        case .iTerm: "iTerm"
++        }
++    }
++
++    var runTitle: String { String(localized: "Run in \(name)") }
++
++    /// Opens a new window and types the query into its shell, as if typed there: the user's own
++    /// shell, aliases and history. Terminal and iTerm reuse the window a cold launch opens.
++    func appleScript(running command: String, home: String) -> String {
++        let text = Self.literal(command)
++        let header = """
++            set wasRunning to application id "\(bundleID)" is running
++            tell application id "\(bundleID)"
++                activate
++            """
++        let body =
++            switch self {
++            case .terminal:
++                """
++                    if wasRunning then
++                        do script \(text)
++                    else
++                        do script \(text) in front window
++                    end if
++                """
++            case .ghostty:
++                """
++                    set config to new surface configuration
++                    set initial working directory of config to \(Self.literal(home))
++                    set initial input of config to \(text) & linefeed
++                    new window with configuration config
++                """
++            case .iTerm:
++                """
++                    if wasRunning then create window with default profile
++                    tell current session of current window to write text \(text)
++                """
++            }
++        return header + "\n" + body + "\nend tell"
++    }
++
++    /// An AppleScript string literal; nothing in the query can end it early.
++    private static func literal(_ text: String) -> String {
++        let escaped = text.replacingOccurrences(of: "\\", with: "\\\\")
++            .replacingOccurrences(of: "\"", with: "\\\"")
++        return "\"" + escaped + "\""
++    }
++}
+diff --git a/Tinycast/Features/Launcher/Service/LauncherListSyncSource.swift b/Tinycast/Features/Launcher/Service/LauncherListSyncSource.swift
+index 8e17afde4fa9ff7d8789a116a1bbd0e6524da166..37ccaee155cd21abb76f57b565230cb11bcd63b3 100644
+--- a/Tinycast/Features/Launcher/Service/LauncherListSyncSource.swift
++++ b/Tinycast/Features/Launcher/Service/LauncherListSyncSource.swift
+@@ -9,8 +9,9 @@ final class LauncherListSyncSource: SyncSource {
+ 
+     private static let favoritesKey = "favorites"
+     private static let fallbacksKey = "fallbacks"
+-    /// A synced list may turn it off, never on: it runs what the query says.
+-    private static let shellFallback = Fallback.builtin(.runShellCommand).id
++    /// A synced list may turn them off, never on: they run what the query says.
++    private static let shellFallbacks = [Fallback.Builtin.runShellCommand, .runInTerminal]
++        .map { Fallback.builtin($0).id }
+ 
+     let id = SyncSourceID.launcherLists
+     private let favorites: FavoritesStore
+@@ -52,7 +53,7 @@ final class LauncherListSyncSource: SyncSource {
+             let incoming = SyncPayload.decode(Fallbacks.self, from: data)
+         {
+             var disabled = Set(incoming.disabled)
+-            if fallbacks.disabledIDs.contains(Self.shellFallback) { disabled.insert(Self.shellFallback) }
++            disabled.formUnion(Self.shellFallbacks.filter(fallbacks.disabledIDs.contains))
+             fallbacks.replace(order: incoming.order, disabled: disabled)
+         }
+         return []
+diff --git a/Tinycast/Features/Launcher/Service/TerminalLauncher.swift b/Tinycast/Features/Launcher/Service/TerminalLauncher.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..9fcb79efb0c100eaa5a924457d0c9be7c3e3eef9
+--- /dev/null
++++ b/Tinycast/Features/Launcher/Service/TerminalLauncher.swift
+@@ -0,0 +1,52 @@
++import AppKit
++
++/// tinycast-roseblud: the Run in Terminal fallback, which asks the chosen terminal over Apple
++/// events to run the query in a new window.
++@MainActor
++enum TerminalLauncher {
++    static func appURL(_ choice: TerminalChoice) -> URL? {
++        NSWorkspace.shared.urlForApplication(withBundleIdentifier: choice.bundleID)
++    }
++
++    /// The fallback row, named and drawn after the chosen terminal; a missing one keeps the glyph.
++    static func entry() -> AppEntry {
++        let base = CommandCatalog.makeEntry(.runInTerminal)
++        let choice = TerminalChoice.stored()
++        let app = appURL(choice)
++        var entry = AppEntry(
++            id: base.id, name: choice.runTitle, url: app ?? base.url, bundleID: nil,
++            kind: base.kind, settingsOwner: base.settingsOwner, subtitle: nil,
++            alternateTitles: [base.name])
++        entry.iconOverride = app.map { .file(stamp: FileIconStamp.value(for: $0)) }
++        return entry
++    }
++
++    static func open(_ query: String, core: AppCore) {
++        let command = query.trimmingCharacters(in: .whitespacesAndNewlines)
++        guard !command.isEmpty else { return }
++        core.paletteCoordinator.hidePalette(restoreFocus: false)
++        let choice = TerminalChoice.stored()
++        guard appURL(choice) != nil else {
++            return core.showMessage(String(localized: "Couldn't open \(choice.name)"), tone: .danger)
++        }
++        let source = choice.appleScript(running: command, home: NSHomeDirectory())
++        Task {
++            guard let failure = await run(source, in: choice) else { return }
++            core.showMessage(failure, tone: .danger)
++        }
++    }
++
++    /// Nil when it ran. A cold terminal answers in seconds, so the send never blocks the main actor.
++    private static func run(_ source: String, in choice: TerminalChoice) async -> String? {
++        await Task.detached(priority: .userInitiated) {
++            var errorInfo: NSDictionary?
++            NSAppleScript(source: source)?.executeAndReturnError(&errorInfo)
++            guard let errorInfo else { return nil }
++            if errorInfo[NSAppleScript.errorNumber] as? Int == -1743 {
++                return String(
++                    localized: "Allow Tinycast to control \(choice.name) in Privacy & Security → Automation.")
++            }
++            return String(localized: "Couldn't open \(choice.name)")
++        }.value
++    }
++}
+diff --git a/Tinycast/Features/Launcher/Settings/FallbacksSettingsView.swift b/Tinycast/Features/Launcher/Settings/FallbacksSettingsView.swift
+index 7fd6c655a3ea307a607e7eda27b0b8e7c656b1b9..093bce4bf8cc4a740dbc46e936e4aadbb7e90768 100644
+--- a/Tinycast/Features/Launcher/Settings/FallbacksSettingsView.swift
++++ b/Tinycast/Features/Launcher/Settings/FallbacksSettingsView.swift
+@@ -27,6 +27,7 @@ struct FallbacksSettingsView: View {
+                     .font(.caption)
+                     .foregroundStyle(.secondary)
+             }
++            TerminalFallbackSection()  // tinycast-roseblud
+         }
+         .formStyle(.grouped)
+         .settingsScrollTarget(.fallbacks)
+@@ -42,6 +43,7 @@ private struct FallbackRow: View {
+ 
+     @Environment(AppCore.self) private var core
+     @Environment(FallbackStore.self) private var store
++    @AppStorage(TerminalChoice.key) private var terminal = TerminalChoice.terminal  // tinycast-roseblud
+ 
+     var body: some View {
+         if let entry = core.fallbackCoordinator.entry(for: fallback) {
+diff --git a/Tinycast/Features/Launcher/Settings/TerminalFallbackSection.swift b/Tinycast/Features/Launcher/Settings/TerminalFallbackSection.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..771a44500b45ace730178380fdcffde7b28d551b
+--- /dev/null
++++ b/Tinycast/Features/Launcher/Settings/TerminalFallbackSection.swift
+@@ -0,0 +1,29 @@
++import SwiftUI
++
++/// tinycast-roseblud: Settings → Fallbacks, the app the Run in Terminal fallback runs a query in.
++struct TerminalFallbackSection: View {
++    @AppStorage(TerminalChoice.key) private var choice = TerminalChoice.terminal
++
++    /// Installed ones only, plus the stored choice so a removed app still shows what is set.
++    private var options: [TerminalChoice] {
++        TerminalChoice.allCases.filter { $0 == choice || TerminalLauncher.appURL($0) != nil }
++    }
++
++    var body: some View {
++        Section {
++            Picker(selection: $choice) {
++                ForEach(options) { option in
++                    Text(option.name).tag(option)
++                }
++            } label: {
++                SettingsRowTitle(.fallbacksTerminal, "Terminal app")
++            }
++        } header: {
++            SettingsSectionHeader(.fallbacksTerminal)
++        } footer: {
++            Text("Opens a new window and runs the query there, as if you typed it. The first run asks to let Tinycast control the app.")
++                .font(.caption)
++                .foregroundStyle(.secondary)
++        }
++    }
++}
+diff --git a/Tinycast/Features/Launcher/UI/FallbackCoordinator.swift b/Tinycast/Features/Launcher/UI/FallbackCoordinator.swift
+index df952bfe7ca55ac65b4b5d3b340518420cae2fdc..0b33cc8a5e0b294a42bf4bbb6fd10c5f2d0423b0 100644
+--- a/Tinycast/Features/Launcher/UI/FallbackCoordinator.swift
++++ b/Tinycast/Features/Launcher/UI/FallbackCoordinator.swift
+@@ -35,6 +35,7 @@ final class FallbackCoordinator {
+     /// Nil for a quicklink deleted since the order was stored.
+     func entry(for fallback: Fallback) -> AppEntry? {
+         switch fallback {
++        case .builtin(.runInTerminal): return TerminalLauncher.entry()  // tinycast-roseblud
+         case .builtin(let builtin): return CommandCatalog.makeEntry(builtin.command)
+         case .quicklink(let id): return quicklinks.quicklink(id: id).map(AppEntry.init)
+         }
+@@ -45,6 +46,7 @@ final class FallbackCoordinator {
+         case .builtin(.quickAI): core.quickAICoordinator.ask(query)
+         case .builtin(.searchFiles): core.fileSearchCoordinator.show(query: query)
+         case .builtin(.runShellCommand): core.customCommandCoordinator.runShellCommand(query)
++        case .builtin(.runInTerminal): TerminalLauncher.open(query, core: core)
+         case .builtin(.define): core.dictionaryCoordinator.show(term: query)
+         case .quicklink(let id): core.quicklinkCoordinator.openQuicklink(id: id, filling: query)
+         }
+@@ -72,7 +74,7 @@ final class FallbackCoordinator {
+         case .quickAI: return settings.aiEnabled
+         case .searchFiles: return settings.fileSearchEnabled
+         // Its own capability: this shell is not the custom-command library's switch to hold.
+-        case .runShellCommand: return true
++        case .runShellCommand, .runInTerminal: return true
+         // Settings › Commands is Define's only switch, so hiding the command there hides this too.
+         case .define: return visibility.isVisible(CommandCatalog.makeEntry(.define))
+         }
+diff --git a/Tinycast/Features/Launcher/UI/LauncherCoordinator.swift b/Tinycast/Features/Launcher/UI/LauncherCoordinator.swift
+index f2cdaffff3e0df914e79c5d773b850a6876c51f8..f2165ff8794fbf4a6ffea839fa7d7c303645044d 100644
+--- a/Tinycast/Features/Launcher/UI/LauncherCoordinator.swift
++++ b/Tinycast/Features/Launcher/UI/LauncherCoordinator.swift
+@@ -199,7 +199,7 @@ final class LauncherCoordinator {
+             Task { await core.cameraCoordinator.show() }
+         case .define:
+             core.dictionaryCoordinator.show()
+-        case .openInBrowser, .runShellCommand:
++        case .openInBrowser, .runShellCommand, .runInTerminal:
+             break  // Query-driven: each runs where the typed text is, never through this funnel.
+         case .joinNextMeeting:
+             calendarCoordinator.joinNextMeeting()
+diff --git a/Tinycast/Features/Settings/SettingsAnchor.swift b/Tinycast/Features/Settings/SettingsAnchor.swift
+index 791717b3bc1bafd67fb60f2a1389d16de44c4cae..3872b03fb6567008908fe065ba3e26bd6507e9f4 100644
+--- a/Tinycast/Features/Settings/SettingsAnchor.swift
++++ b/Tinycast/Features/Settings/SettingsAnchor.swift
+@@ -45,6 +45,7 @@ extension SettingsAnchor {
+         title: LocalizedStringResource("apple-shortcuts-section", defaultValue: "Shortcuts"))
+ 
+     static let fallbacksFallbacks = Self(tab: .fallbacks, title: "Fallbacks")
++    static let fallbacksTerminal = Self(tab: .fallbacks, title: "Run in Terminal")  // tinycast-roseblud
+ 
+     static let aiAI = Self(tab: .ai, title: "AI")
+     static let aiProviders = Self(tab: .ai, title: "Providers")
+diff --git a/Tinycast/Features/Settings/SettingsSearchCatalog.swift b/Tinycast/Features/Settings/SettingsSearchCatalog.swift
+index f928c07d69dfa3a88c93dcf62fabad9df4441c86..bff422c6998abf5ce5dc71d20fc4388f9a07b496 100644
+--- a/Tinycast/Features/Settings/SettingsSearchCatalog.swift
++++ b/Tinycast/Features/Settings/SettingsSearchCatalog.swift
+@@ -305,7 +305,8 @@ enum SettingsSearchCatalog {
+     private static let fallbacks: [SettingsSearchEntry] = [
+         .init(
+             pane: .fallbacks,
+-            keywords: ["no results", "empty", "search web", "order"])
++            keywords: ["no results", "empty", "search web", "order"]),
++        .init(.fallbacksTerminal, "Terminal app", keywords: ["ghostty", "iterm", "shell"])
+     ]
+ 
+     private static let ai: [SettingsSearchEntry] = [
+diff --git a/Tinycast/Resources/Localizable.xcstrings b/Tinycast/Resources/Localizable.xcstrings
+index 2c9eed433cc4e37fcb1dcc23759b692591a6fa3e..bd7051f5de373836b81d34e075d502828e8200cf 100644
+--- a/Tinycast/Resources/Localizable.xcstrings
++++ b/Tinycast/Resources/Localizable.xcstrings
+@@ -22130,6 +22130,58 @@
+         }
+       }
+     },
++    "Allow Tinycast to control %@ in Privacy & Security → Automation." : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Erlaube Tinycast unter „Datenschutz & Sicherheit“ → „Automation“, %@ zu steuern."
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Permite que Tinycast controle %@ en Privacidad y seguridad → Automatización."
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Autorisez Tinycast à contrôler %@ dans Confidentialité et sécurité → Automatisation."
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "「プライバシーとセキュリティ」→「オートメーション」で Tinycast に %@ の制御を許可してください。"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "개인정보 보호 및 보안 → 자동화에서 Tinycast가 %@을(를) 제어하도록 허용하십시오."
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Permita que o Tinycast controle o %@ em Privacidade e Segurança → Automação."
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Разрешите Tinycast управлять %@ в разделе «Конфиденциальность и безопасность» → «Автоматизация»."
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "请在“隐私与安全性”→“自动化”中允许 Tinycast 控制 %@。"
++          }
++        }
++      }
++    },
+     "Allow Tinycast to control Finder in System Settings › Privacy & Security › Automation, then try again." : {
+       "localizations" : {
+         "de" : {
+@@ -43146,6 +43198,58 @@
+         }
+       }
+     },
++    "Couldn't open %@" : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "%@ konnte nicht geöffnet werden"
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "No se pudo abrir %@"
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Impossible d’ouvrir %@"
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "%@を開けませんでした"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "%@을(를) 열 수 없음"
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Não foi possível abrir o %@"
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Не удалось открыть %@"
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "无法打开 %@"
++          }
++        }
++      }
++    },
+     "Couldn't open the meeting link" : {
+       "localizations" : {
+         "de" : {
+@@ -92150,6 +92254,58 @@
+         }
+       }
+     },
++    "Opens a new window and runs the query there, as if you typed it. The first run asks to let Tinycast control the app." : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Öffnet ein neues Fenster und führt die Suche dort aus, als hättest du sie eingegeben. Beim ersten Mal wird gefragt, ob Tinycast die App steuern darf."
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Abre una ventana nueva y ejecuta la consulta allí, como si la hubieras escrito. La primera vez se pide permiso para que Tinycast controle la app."
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Ouvre une nouvelle fenêtre et y exécute la requête, comme si vous l’aviez tapée. La première fois, macOS demande d’autoriser Tinycast à contrôler l’app."
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "新しいウインドウを開き、入力したのと同じようにクエリを実行します。初回は Tinycast にアプリの制御を許可するか確認されます。"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "새 창을 열고 직접 입력한 것처럼 검색어를 실행합니다. 처음 실행할 때 Tinycast가 앱을 제어하도록 허용할지 묻습니다."
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Abre uma nova janela e executa a consulta nela, como se você a tivesse digitado. Na primeira vez, é pedida permissão para o Tinycast controlar o app."
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Открывает новое окно и выполняет там запрос, как если бы вы его ввели. При первом запуске появится запрос на разрешение Tinycast управлять приложением."
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "打开一个新窗口并在其中运行查询，就像你亲自输入一样。首次运行时会询问是否允许 Tinycast 控制该应用。"
++          }
++        }
++      }
++    },
+     "Opens to" : {
+       "localizations" : {
+         "de" : {
+@@ -106604,6 +106760,110 @@
+         }
+       }
+     },
++    "Run in %@" : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "In %@ ausführen"
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Ejecutar en %@"
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Exécuter dans %@"
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "%@で実行"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "%@에서 실행"
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Executar no %@"
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Выполнить в %@"
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "在 %@ 中运行"
++          }
++        }
++      }
++    },
++    "Run in Terminal" : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Im Terminal ausführen"
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Ejecutar en Terminal"
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Exécuter dans Terminal"
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "ターミナルで実行"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "터미널에서 실행"
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Executar no Terminal"
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Выполнить в Терминале"
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "在终端中运行"
++          }
++        }
++      }
++    },
+     "Run this layout" : {
+       "localizations" : {
+         "de" : {
+@@ -120960,6 +121220,58 @@
+         }
+       }
+     },
++    "Terminal app" : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Terminal-App"
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "App de terminal"
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "App de terminal"
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "ターミナルアプリ"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "터미널 앱"
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "App de terminal"
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Приложение терминала"
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "终端应用"
++          }
++        }
++      }
++    },
+     "Test Connection" : {
+       "localizations" : {
+         "de" : {
+diff --git a/docs/features/launcher.md b/docs/features/launcher.md
+index cd0f031d1e4c12e98edcf88924e45cfa6435ebfa..18606ba1adfd5ef874e53b7a78cc285d4d0f3ffe 100644
+--- a/docs/features/launcher.md
++++ b/docs/features/launcher.md
+@@ -333,7 +333,7 @@ A **fallback** is the other half of the query-driven idea: a command the query i
+ offered under a `Use “…” with…` header **below every result**, whatever the query says. A contextual
+ row leads because it recognised the query; a fallback trails because nothing did.
+ 
+-`Fallback` (`Launcher/Model/`) is the whole vocabulary: `.builtin(Builtin)` for the four shipped
++`Fallback` (`Launcher/Model/`) is the whole vocabulary: `.builtin(Builtin)` for the five shipped
+ destinations and `.quicklink(UUID)` for a user's own. `Builtin` exists rather than a bare `CommandID`
+ so `FallbackCoordinator.run` is **exhaustive**: a fifth built-in cannot compile without saying where
+ its query goes. `Fallback.id` is deliberately the row's own `AppEntry.id`, which is what lets a stored
+@@ -344,6 +344,7 @@ order name a live row across a rename or a reinstall.
+ | Quick AI          | a fresh Quick AI chat, question already sent (`QuickAICoordinator.ask`)               | `aiEnabled`                                               |
+ | Search Files      | the file-search screen, already narrowed                                              | `fileSearchEnabled`                                       |
+ | Run Shell Command | `/bin/zsh`, streamed into the Command Output window                                   | always                                                    |
++| Run in Terminal  | a new window of the terminal picked in Settings › Fallbacks (`TerminalLauncher`)       | always                                                    |
+ | Define Word       | the dictionary screen, already showing the entry (see [dictionary.md](dictionary.md)) | the Define Word command is visible in Settings › Commands |
+ | a quicklink       | its first `{argument}`                                                                | `quicklinksEnabled`, and the link has a placeholder       |
+ 
+@@ -355,6 +356,18 @@ sends the row to Search Quicklinks with its header fields pre-filled (see
+ not an `{argument}` and is resolved by replacing the context, so seeding it through `userArguments`
+ would silently do nothing.
+ 
++**Run in Terminal is named and drawn after the terminal it opens** (*Run in Ghostty*, with
++Ghostty's icon; the terminal glyph only while the app is missing), from
++`TerminalChoice`, a fixed list of terminals whose AppleScript can open a window and type into its
++shell: Terminal (`do script`), Ghostty (`initial input`) and iTerm (`write text`). The picker lists
++the installed ones. `TerminalLauncher` runs that script off the main actor, so the query lands in the
++user's own interactive shell in `~`, with their aliases and history, and the window stays open on
++the output. Each terminal asks once for Automation; a refusal (-1743) says where to allow it. Terminal
++and iTerm reuse the window a cold launch opens; Ghostty always opens its own. Typing rather than a
++script file is deliberate: a `.command` file is announced as `'path'; exit` in a temp directory, and
++nesting an interactive shell inside it suspends the outer one on `SIGTTOU`. A synced fallback list
++can turn it off, never on, as with Run Shell Command.
++
+ **Run Shell Command carries its own switch, not the custom-command library's.** Turning off Custom
+ Commands hides a library of saved commands; it says nothing about a shell line someone types
+ deliberately. The fallback's checkbox is the switch. The run is an ad-hoc `CustomCommand` that is

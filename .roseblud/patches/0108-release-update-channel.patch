@@ -1,0 +1,41 @@
+diff --git a/Tests/UpdatesTests.swift b/Tests/UpdatesTests.swift
+index b0c1fab06189e924db1a87254b63ca0ee0222cec..7efff4c5eba4d1575068fa583e12f6eb26283340 100644
+--- a/Tests/UpdatesTests.swift
++++ b/Tests/UpdatesTests.swift
+@@ -108,6 +108,9 @@ struct UpdatesTests {
+         expect(beta == .beta, "the beta bundle id is the beta channel")
+         expect(dev == .development, "the dev bundle id is a local build")
+         expect(ReleaseChannel(bundleID: nil) == .development, "a missing bundle id never updates")
++        expect(
++            ReleaseChannel(bundleID: "com.tinycast.app") == .stable,
++            "the Roseblud release bundle id receives stable updates")
+ 
+         expect(stable.updatesItself && beta.updatesItself, "both shipped channels update")
+         expect(!dev.updatesItself, "a local build does not update itself")
+diff --git a/Tinycast/Features/Updates/Model/ReleaseChannel.swift b/Tinycast/Features/Updates/Model/ReleaseChannel.swift
+index fb06c317ec3b4938b442e3731603a4e79f460db8..4dcc7fe401d157663cef50d3affb46928821a831 100644
+--- a/Tinycast/Features/Updates/Model/ReleaseChannel.swift
++++ b/Tinycast/Features/Updates/Model/ReleaseChannel.swift
+@@ -9,7 +9,7 @@ enum ReleaseChannel: Sendable {
+ 
+     init(bundleID: String?) {
+         switch bundleID {
+-        case "com.abueammar.tinycast": self = .stable
++        case "com.abueammar.tinycast", "com.tinycast.app": self = .stable
+         case "com.abueammar.tinycast.beta": self = .beta
+         default: self = .development
+         }
+diff --git a/docs/features/updates.md b/docs/features/updates.md
+index be927a376813918af6c74b197deea7bfcf23e1ff..0158aeed12cef8b3ee1062e4b7a7ffab9fcba9f2 100644
+--- a/docs/features/updates.md
++++ b/docs/features/updates.md
+@@ -86,6 +86,9 @@ the header row. It cannot reuse `ExtensionToastPill`, because extension views st
+ | `com.abueammar.tinycast.beta` | `.beta`        | prereleases |
+ | anything else                 | `.development` | nothing     |
+ 
++Roseblud releases retain `com.tinycast.app` and use the regular release zip, with the same bundle-id
++and signature checks as every other stable build. Development and unknown bundle ids never update.
++
+ `AppVersion` parses `MAJOR.MINOR.PATCH` and `MAJOR.MINOR.PATCH-beta.N` with semver precedence: a
+ prerelease sorts below the release it leads to, and `beta.10` above `beta.9`. Everything else parses
+ to nil, so an off-shape tag can never be offered as an update. A release whose tag disagrees with
