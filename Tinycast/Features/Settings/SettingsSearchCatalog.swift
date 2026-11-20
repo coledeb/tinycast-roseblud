@@ -58,6 +58,14 @@ enum SettingsSearchCatalog {
         var isEmpty: Bool { terms.isEmpty }
     }
 
+    /// Launcher `?` scope: a bare `?` browses every pane, `?text` searches rows and panes.
+    static func scopeResults(for scoped: String, limit: Int = 50) -> [SettingsSearchEntry] {
+        guard !scoped.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return entries.filter { $0.target == nil }
+        }
+        return results(for: scoped, limit: limit)
+    }
+
     static func results(for raw: String, limit: Int = 50) -> [SettingsSearchEntry] {
         let query = Query(raw)
         guard !query.isEmpty else { return [] }
