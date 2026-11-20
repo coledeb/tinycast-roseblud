@@ -10,6 +10,9 @@ struct LauncherList: View {
     let meetingCount: Int
     let suggestionCount: Int
     let matchCount: Int
+    /// A query is typed, so ⌘1–⌘9 open the first results instead of favorites.
+    let numbersResults: Bool
+    static let numberedResultLimit = 9
     /// Changes only when the list should scroll, so mouse selection never yanks it.
     let scroll: ScrollIntent
     /// The card at flat index 0, when one leads. At most one ever does.
@@ -183,7 +186,7 @@ struct LauncherList: View {
                                         app: app,
                                         selected: app.id == selectedRowID,
                                         running: runningApps.isRunning(app),
-                                        slot: nil
+                                        slot: resultSlot(app, in: rows)  // tinycast-space
                                     )
                                     .contentShape(Rectangle())
                                     .onRowTap(drag: drag(for: app)) { onActivate(app) }
@@ -379,5 +382,20 @@ private struct AppRow: View {
                 .fill(fill)
         )
         .armedHover($hovered)
+    }
+}
+
+// tinycast-space: while a query is typed no favorite is pinned, so the first nine entry rows show
+// ⌘1–⌘9 instead; `LauncherScreen.launchFavorite` opens the same rows.
+extension LauncherList {
+    private func resultSlot(_ app: AppEntry, in rows: [Row]) -> Character? {
+        guard numbersResults else { return nil }
+        var number = 0
+        for case .app(let entry) in rows {
+            guard number < Self.numberedResultLimit else { return nil }
+            if entry.id == app.id { return FavoriteSlots.digit(at: number) }
+            number += 1
+        }
+        return nil
     }
 }
