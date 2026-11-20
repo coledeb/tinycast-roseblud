@@ -141,6 +141,18 @@ enum SettingsSearchCatalog {
             .generalAppearance, "Appearance",
             keywords: ["dark", "light", "mode", "theme"]),
         .init(
+            .generalAppearance, "Light theme",
+            keywords: ["raycast theme", "ray.so", "colors", "palette", "import"]),
+        .init(
+            .generalAppearance, "Dark theme",
+            keywords: ["raycast theme", "ray.so", "colors", "palette", "import"]),
+        .init(
+            .generalAppearance, "Theme background",
+            keywords: ["opacity", "transparency", "raycast theme"]),
+        .init(
+            .generalAppearance, "Theme the compact bar",
+            keywords: ["compact", "search bar", "raycast theme", "colors"]),
+        .init(
             .generalAppearance, "Show animations",
             keywords: ["motion", "transitions", "reduce motion", "effects", "instant"]),
         .init(
