@@ -357,6 +357,7 @@ run CompactBarTests        Tinycast/Features/Launcher/Model/CompactBarSelection.
                            Tinycast/Platform/LocalizedResource.swift \
                            Tinycast/DesignSystem/IconTint.swift
 run FallbackTests          Tinycast/Features/Launcher/Model/Fallback.swift \
+                           Tinycast/Features/Launcher/Model/TerminalChoice.swift \
                            Tinycast/Features/Launcher/Model/CommandID.swift \
                            Tinycast/Features/HotKeys/Model/HotKeyAction.swift \
                            Tinycast/Features/QuickActions/Model/QuickAction.swift \

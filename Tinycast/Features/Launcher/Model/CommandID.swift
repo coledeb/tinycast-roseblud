@@ -19,6 +19,7 @@ enum CommandID: String, CaseIterable, Sendable {
     case openCamera = "command:open-camera"
     case openInBrowser = "command:open-in-browser"
     case runShellCommand = "command:run-shell-command"
+    case runInTerminal = "command:run-in-terminal"  // tinycast-roseblud
     case createCustomCommand = "command:create-custom-command"
     case searchCustomCommands = "command:search-custom-commands"
     case define = "command:define"
@@ -94,6 +95,7 @@ enum CommandID: String, CaseIterable, Sendable {
         case .openCamera: return "Open Camera"
         case .openInBrowser: return "Open in Browser"
         case .runShellCommand: return "Run Shell Command"
+        case .runInTerminal: return "Run in Terminal"  // tinycast-roseblud
         case .createCustomCommand: return "Create Custom Command"
         case .searchCustomCommands: return "Search Custom Commands"
         case .define: return "Define Word"
@@ -143,7 +145,8 @@ enum CommandID: String, CaseIterable, Sendable {
         case .switchWindows, .switchWindowsBackwards: return "macwindow.on.rectangle"
         case .openCamera: return "camera.fill"
         case .openInBrowser: return "globe"
-        case .runShellCommand, .createCustomCommand, .searchCustomCommands: return "terminal.fill"
+        case .runShellCommand, .runInTerminal, .createCustomCommand, .searchCustomCommands:
+            return "terminal.fill"
         case .define: return "book.closed.fill"
         case .joinNextMeeting: return "video.fill"
         case .mySchedule: return "calendar"
@@ -185,7 +188,7 @@ enum CommandID: String, CaseIterable, Sendable {
             .exportQuicklinks:
             return .blue
         case .searchMenuItems, .switchWindows, .switchWindowsBackwards, .runShellCommand,
-            .createCustomCommand, .searchCustomCommands:
+            .runInTerminal, .createCustomCommand, .searchCustomCommands:
             return .graphite
         case .openCamera, .settings, .about: return .gray
         case .define, .searchSnippets, .createSnippet: return .brown
@@ -241,7 +244,7 @@ enum CommandID: String, CaseIterable, Sendable {
 
     /// Query-driven: the typed text is their input, so they are built where offered, never listed.
     var isQueryDriven: Bool {
-        self == .openInBrowser || self == .runShellCommand
+        self == .openInBrowser || self == .runShellCommand || self == .runInTerminal
     }
 
     /// A chord carries no query, and none should be able to terminate the app outright.
