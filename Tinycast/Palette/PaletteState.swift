@@ -24,6 +24,12 @@ final class PaletteState {
         didSet { if oldValue != clipboardFilter { restoredSelection = nil } }
     }
     var fileSearchFilter: FileSearchFilter = .all
+    /// tinycast-space: File Search narrowed to one folder. Leaving it is a step back of its own,
+    /// taken by `pop` before the stack's; `FileSearchCoordinator` searches again on each change.
+    var fileSearchFolder: String? {
+        didSet { if oldValue != fileSearchFolder { onFileSearchFolderChanged?() } }
+    }
+    @ObservationIgnored var onFileSearchFolderChanged: (() -> Void)?
     var emojiCategoryFilter: EmojiCategoryFilter = .all
     /// Nil means the configured default; zoom only overrides it for this picker session.
     var emojiGridColumnsOverride: EmojiGridColumns?
@@ -84,7 +90,7 @@ final class PaletteState {
         isVisible = visible
     }
 
-    var canGoBack: Bool { !backStack.isEmpty }
+    var canGoBack: Bool { !backStack.isEmpty || isInFileSearchFolder }
 
     func prepare(mode: PaletteMode) {
         backStack.removeAll()
@@ -113,6 +119,7 @@ final class PaletteState {
     }
 
     func pop(preservingSelection: Bool = false) -> Bool {
+        if leaveFileSearchFolder() { return true }
         guard let frame = backStack.popLast() else { return false }
         openScreen(frame.mode)
         clipboardFilter = frame.clipboardFilter
@@ -156,6 +163,7 @@ final class PaletteState {
         argumentEntryID = nil
         clipboardFilter = .all
         fileSearchFilter = .all
+        fileSearchFolder = nil
         emojiCategoryFilter = .all
         emojiGridColumnsOverride = nil
         forceExpanded = false
@@ -248,5 +256,20 @@ final class PaletteState {
         guard hoverHighlightArmed else { return }
         hoverHighlightArmed = false
         hoverDisarmToken = UUID()
+    }
+}
+
+// tinycast-space: File Search's folder scope; see `fileSearchFolder`.
+extension PaletteState {
+    /// Read only in File Search: the Tab ring leaves for the launcher without resetting the screen.
+    var isInFileSearchFolder: Bool { mode == .fileSearch && fileSearchFolder != nil }
+
+    /// The query is cleared first, so the search the folder change starts is already the right one.
+    @discardableResult
+    func leaveFileSearchFolder() -> Bool {
+        guard isInFileSearchFolder else { return false }
+        rewriteQuery("")
+        fileSearchFolder = nil
+        return true
     }
 }
