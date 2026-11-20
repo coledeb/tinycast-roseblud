@@ -525,8 +525,8 @@ sizing, but the separator takes no selection index, so navigation still walks on
 taller than its default cap ends its viewport mid-row, so the fold never lands on a separator or section
 title, and both hairlines are one device pixel.
 The app menu groups Check for Updates and Changelog, About and Support, then Settings and Quit,
-under the version header. It shares the default five-and-a-half-row cap, so it opens at the Actions
-menu's height with Settings partially visible; scrolling or keyboard navigation reveals the rest.
+under the version header. It grows to fit every row and both separators, so Quit sits fully above the
+search band without scrolling.
 Built-in action menus mark boundaries between opening or copying, managing the item, settings, and
 deletion. Menus offering one kind of action, such as calculator copies, color formats, or emoji
 transfers, keep their rows in one group.

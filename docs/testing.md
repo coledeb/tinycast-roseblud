@@ -487,9 +487,9 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
   move the menu highlight. Escape clears a non-empty query, then closes the menu on the next press
 - The bottom-left app menu also searches from its bottom band; every header menu (including Emoji
   categories, File Search filters and extension dropdowns) searches from its top band
-- The app menu opens at the ⌘K Actions menu's height with Check for Updates and Changelog, a
-  separator, About and Support, a separator, then Settings partially visible; Settings and Quit
-  scroll fully into view with the pointer or arrow keys. Filtering to fewer rows shrinks the menu
+- The app menu opens with Check for Updates and Changelog, a separator, About and Support, a
+  separator, then Settings and Quit, all fully visible without scrolling. Filtering to fewer rows
+  shrinks the menu
 - A long menu opens with unchanged row insets; while scrolling, rows can reach the panel edges
 - A click in the palette but outside its menu closes only the menu; a click outside the palette
   closes both, regardless of the menu query; the next summon accepts typing immediately
