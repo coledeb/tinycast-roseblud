@@ -158,8 +158,17 @@ final class AppSettings {
     }
 
     var launchAtLogin: Bool {
-        didSet { LaunchAtLogin.set(launchAtLogin) }
+        get { loginItemEnabled }
+        set {
+            loginItemRead?.cancel()
+            loginItemEnabled = newValue
+            LaunchAtLogin.set(newValue)
+        }
     }
+    /// As SMAppService last reported it; its XPC answer takes ~40 ms, so launch reads it off main.
+    private var loginItemEnabled = false
+    /// Cancelled by a write, so a status read still in flight cannot undo the user's choice.
+    @ObservationIgnored private var loginItemRead: Task<Void, Never>?
 
     /// The launcher icon's visibility; dragging the icon out of the menu bar turns it off.
     var showInMenuBar: Bool {
@@ -723,8 +732,13 @@ final class AppSettings {
 
     /// Not in defaults: the login item is the system's, so it is read back rather than told.
     func reloadLaunchAtLogin() {
-        let enabled = LaunchAtLogin.isEnabled
-        if launchAtLogin != enabled { launchAtLogin = enabled }
+        loginItemRead?.cancel()
+        loginItemRead = Task { [weak self] in
+            let enabled = await LaunchAtLogin.isEnabled()
+            // Adopted, not set again: the system already has it, and an unchanged value stays quiet.
+            guard !Task.isCancelled, let self, loginItemEnabled != enabled else { return }
+            loginItemEnabled = enabled
+        }
     }
 
     /// Exhaustive, so a new key can't build unadopted; key order moves size before position.
@@ -880,7 +894,6 @@ final class AppSettings {
         clipboardDefaultAction =
             defaults.string(forKey: Key.clipboardDefaultAction.rawValue)
             .flatMap(ClipboardDefaultAction.init) ?? .paste
-        launchAtLogin = LaunchAtLogin.isEnabled
         showInMenuBar =
             defaults.object(forKey: Key.showInMenuBar.rawValue) == nil
             || defaults.bool(forKey: Key.showInMenuBar.rawValue)
@@ -1106,5 +1119,10 @@ final class AppSettings {
             (defaults.stringArray(forKey: Key.iCloudSyncOptedInCategories.rawValue) ?? [])
                 .compactMap(SyncCategory.init(rawValue:)))
         allowedDeepLinks = defaults.stringArray(forKey: Key.allowedDeepLinks.rawValue) ?? []
+        loginItemRead = Task { [weak self] in
+            let enabled = await LaunchAtLogin.isEnabled()
+            guard !Task.isCancelled else { return }
+            self?.loginItemEnabled = enabled
+        }
     }
 }
