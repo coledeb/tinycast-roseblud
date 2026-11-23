@@ -489,7 +489,10 @@ final class AppCore {
         hotKeys.dictationEnabled = settings.dictationEnabled
         hotKeys.dictationHoldToTalk = settings.dictationMode == .pushToTalk
         KeyShortcut.displayedHyperChord = { [settings] in
-            guard settings.hyperKey != .none else { return nil }
+            // tinycast-space: another app can own the Hyper key and still want the ✦ glyph.
+            guard settings.hyperKey != .none
+                || UserDefaults.standard.bool(forKey: "spaceHyperGlyphWithoutRemap")
+            else { return nil }
             return KeyShortcut.hyperChord(includesShift: settings.hyperKeyIncludesShift)
         }
         if settings.snippetsEnabled { Task { await snippetsStore.start() } }
