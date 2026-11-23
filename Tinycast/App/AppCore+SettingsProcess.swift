@@ -64,6 +64,7 @@ extension AppCore {
         rooms.reload()
         calendarStore.reloadHiddenCalendars()
         hotKeys.reloadBindings()
+        SpaceTheme.reload()  // tinycast-space: a theme picked in the other process
     }
 
     /// Open chats follow a preset changed elsewhere, as they did when the pane ran here.

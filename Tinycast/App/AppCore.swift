@@ -292,6 +292,7 @@ final class AppCore {
 
     func start(launchedByUser: Bool) {
         Signposts.interval("AppCore.start") {
+            SpaceTheme.start()  // tinycast-space: before the extension scan, which must see the Theme command
             NSApp.setActivationPolicy(.accessory)
             dictationAudioDucker.recover()
             load()
@@ -551,6 +552,8 @@ final class AppCore {
             if !ConfettiOverlay.fire() { showMessage("🎉") }
             return
         }
+        // tinycast-space: a theme link — ray.so, Raycast's Theme Studio, or the Theme command.
+        if SpaceTheme.handle(url, in: self) { return }
         if deepLinkCoordinator.handles(url) {
             deepLinkCoordinator.open(url)
             return
