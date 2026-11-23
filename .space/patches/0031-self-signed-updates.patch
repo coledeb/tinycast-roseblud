@@ -1,0 +1,13 @@
+diff --git a/Scripts/verify-signature.sh b/Scripts/verify-signature.sh
+index 7b9d67c64223fff140155d072c104d10626df78c..b5a09d8cbd283c1d82b860fc2dc623b69856c454 100755
+--- a/Scripts/verify-signature.sh
++++ b/Scripts/verify-signature.sh
+@@ -34,8 +34,6 @@ for BIN in "$APP/Contents/MacOS/$NAME" "$APP/Contents/Helpers/ClipboardTextHelpe
+     INFO="$(codesign -dv --verbose=2 "$BIN" 2>&1)"
+     [[ "$INFO" =~ flags=0x[0-9a-f]+\([^\)]*runtime ]] ||
+         fail "${BIN##*/}: hardened runtime not enabled"
+-    [[ "$INFO" == *$'\nAuthority=Developer ID Application: '* && "$INFO" == *$'\nTimestamp='* ]] ||
+-        fail "${BIN##*/}: not signed with a timestamped Developer ID"
+ done
+ 
+ APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")"
