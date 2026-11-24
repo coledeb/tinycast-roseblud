@@ -7,6 +7,7 @@ enum Fallback: Hashable, Sendable {
         case quickAI
         case searchFiles
         case runShellCommand
+        case runInTerminal  // tinycast-roseblud
         case define
 
         /// Where its name and glyph come from, so a fallback row reads like the command it runs.
@@ -15,6 +16,7 @@ enum Fallback: Hashable, Sendable {
             case .quickAI: return .quickAI
             case .searchFiles: return .searchFiles
             case .runShellCommand: return .runShellCommand
+            case .runInTerminal: return .runInTerminal
             case .define: return .define
             }
         }
@@ -48,6 +50,7 @@ enum Fallback: Hashable, Sendable {
         case .builtin(.quickAI): return String(localized: "Ask Quick AI")
         case .builtin(.searchFiles): return String(localized: "Search Files")
         case .builtin(.runShellCommand): return String(localized: "Run Shell Command")
+        case .builtin(.runInTerminal): return TerminalChoice.stored().runTitle
         case .builtin(.define): return String(localized: "Define Word")
         case .quicklink: return String(localized: "Open Quicklink")
         }

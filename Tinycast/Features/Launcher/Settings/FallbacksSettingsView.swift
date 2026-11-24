@@ -27,6 +27,7 @@ struct FallbacksSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            TerminalFallbackSection()  // tinycast-roseblud
         }
         .formStyle(.grouped)
         .settingsScrollTarget(.fallbacks)
@@ -42,6 +43,7 @@ private struct FallbackRow: View {
 
     @Environment(AppCore.self) private var core
     @Environment(FallbackStore.self) private var store
+    @AppStorage(TerminalChoice.key) private var terminal = TerminalChoice.terminal  // tinycast-roseblud
 
     var body: some View {
         if let entry = core.fallbackCoordinator.entry(for: fallback) {

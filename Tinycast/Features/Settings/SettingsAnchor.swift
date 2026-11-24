@@ -45,6 +45,7 @@ extension SettingsAnchor {
         title: LocalizedStringResource("apple-shortcuts-section", defaultValue: "Shortcuts"))
 
     static let fallbacksFallbacks = Self(tab: .fallbacks, title: "Fallbacks")
+    static let fallbacksTerminal = Self(tab: .fallbacks, title: "Run in Terminal")  // tinycast-roseblud
 
     static let aiAI = Self(tab: .ai, title: "AI")
     static let aiProviders = Self(tab: .ai, title: "Providers")
