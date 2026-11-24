@@ -275,6 +275,8 @@ struct RootPaletteView: View {
             let filtered = appMenuContent.matching(ActionMenuSearchQuery(vm.menuQuery))
             return PaletteMenuContent(
                 popover: filtered.content, selection: $menuSelection,
+                // tinycast-roseblud: fit every row; the spare one covers the separators.
+                visibleRows: CGFloat(filtered.content.items.count + 1),
                 search: PopoverMenu.Search(
                     placeholder: String(localized: "Search for actions…"), placement: .bottom),
                 onActivate: activateMenuItem, preferredSelection: filtered.bestMatch)
