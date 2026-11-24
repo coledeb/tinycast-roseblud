@@ -1,3 +1,75 @@
+# 🌹 Tinycast Roseblud Edition
+
+**Tinycast Roseblud Edition** is a personal, automatically synced fork of
+**[Tinycast Space Edition](https://github.com/sermelipharo/tinycast-space)**, itself a fork of
+**[Tinycast](https://github.com/abue-ammar/tinycast)** by [Abue Ammar](https://github.com/abue-ammar).
+It has everything Space Edition has, plus the few changes below.
+
+Download it from this repository's **[Releases](https://github.com/coledeb/tinycast-roseblud/releases)**;
+the steps are the same as in the [Install](#install) section below. Installed copies update themselves
+from here.
+
+Nothing this fork automates posts to the original repositories: the automation only writes here, and
+the commit messages it copies from upstream have their issue and pull-request links removed, so no
+build or release here shows up on an upstream issue.
+
+GitHub shows this fork as commits "behind" Space Edition even when it's up to date. That's because
+upstream issue links are removed from Space Edition's commit messages, as
+[Tinycast's contributing guide](https://github.com/abue-ammar/tinycast/blob/main/CONTRIBUTING.md#spam)
+asks, and editing a message changes the commit's ID.
+
+## What Roseblud adds
+
+- **Apple SpeechAnalyzer dictation.** Settings → Dictation → Recognizer → *Apple SpeechAnalyzer* uses
+  the speech recognition built into macOS, so there is no model to download (*Install* fetches Apple's
+  language assets once). It follows your system language. With *Insert while recording* on, text is
+  pasted as each phrase settles.
+- **Live transcript.** With Apple SpeechAnalyzer, your words appear above the microphone as you speak,
+  in-progress words dimmed until they settle. Turn it off with *Show live transcript*.
+- **Run in Terminal.** A launcher fallback runs what you typed in a new terminal window. Pick
+  Terminal, Ghostty or iTerm in Settings → Fallbacks → *Terminal app*, and the row takes its name
+  and icon (*Run in Ghostty*).
+- **Search bar icon.** Settings → General → Appearance → *Search bar icon* swaps the magnifier at the
+  left of the search bar for any emoji you like.
+- **Search text size.** Settings → General → Appearance → *Search text size* picks *Large* (the default)
+  or *Small*, a smaller query and prompt in the search bar.
+- **Quick AI hint in the compact bar.** The *Quick AI ⇥* hint now shows in the compact bar too, fading in
+  as the compact shortcuts slide out.
+- **Full app menu.** The menu behind the bottom-left button is tall enough to show *Quit Tinycast*
+  without scrolling.
+- **No flash when typing.** Under a Raycast theme, the window no longer flashes grey as it expands
+  on your first keystroke; the theme's colors are there from the start.
+- **Themed compact bar.** A Raycast theme's gradient now colors the compact bar too, matching the
+  expanded window.
+- **Crisper launcher prompt.** The *Search for apps and commands…* placeholder is brighter and easier
+  to read.
+- **Roseblud Edition.** About says *🌹 Roseblud Edition* and links here, and the in-app updater installs this
+  fork's releases.
+- **Beta channel.** Settings → About → *Update Channel* → *Beta* updates Tinycast to this fork's builds
+  of each upstream Tinycast beta, published here as pre-releases, and to any newer release once it ships.
+  *Stable*, the default, takes releases only.
+- **In-app updates.** Roseblud’s release bundle is recognized as the stable channel, so
+  Check for Updates can check this fork’s releases.
+
+## Beta channel
+
+Tinycast publishes betas between releases, but Space Edition doesn't build them, so this fork builds
+its own. Each [upstream beta](https://github.com/abue-ammar/tinycast/releases) is released here as a
+**pre-release** with the same tag and version (e.g. `v0.13.0-beta.145`), built from this fork's
+`main` once `main` includes it, so it has everything that beta has plus Space Edition's and Roseblud's
+changes.
+
+To get them, open **Settings → About → Update Channel** and pick **Beta**. Tinycast then updates to
+each new beta, and to any newer release once it ships, so a beta always leads on to its release.
+Pick **Stable** to go back: you stay on the installed beta until a release newer than it is out,
+then get releases only. Unlike upstream's separate *Tinycast Beta* app, it is the same app either
+way, so betas share your settings and data; expect the occasional rough edge.
+
+---
+
+> Everything below is Space Edition's README, kept as it is apart from its Releases and Issues links,
+> which point here.
+
 # ✨ Tinycast Space Edition
 
 **Tinycast Space Edition** is an unofficial, automatically synced fork of **[Tinycast](https://github.com/abue-ammar/tinycast)** by
@@ -58,7 +130,7 @@ upstream's releases.
 ## Install
 
 1. Download `Tinycast-<version>.dmg` from this fork's
-   **[Releases](https://github.com/sermelipharo/tinycast-space/releases)** and drag Tinycast to
+   **[Releases](https://github.com/coledeb/tinycast-roseblud/releases)** and drag Tinycast to
    Applications.
 2. The build is self-signed with this fork's own certificate (it is not notarized), so clear the
    quarantine flag once:
@@ -99,7 +171,7 @@ So please:
   maintainer to adopt, support or debug these patches.
 - **Report bugs where they belong.** If it also happens in the original Tinycast, report it
   [upstream](https://github.com/abue-ammar/tinycast/issues), following its templates and rules. If it
-  only happens here, open an issue [in this fork](https://github.com/sermelipharo/tinycast-space/issues).
+  only happens here, open an issue [in this fork](https://github.com/coledeb/tinycast-roseblud/issues).
 - **Support the author, not the fork.** The fork takes no donations. If Tinycast is useful to you,
   [tip Abue Ammar](https://buy.polar.sh/polar_cl_NDVFC20DKQpLcNawsh97QzbARBXD3WNn8v35R0mbJmT).
 

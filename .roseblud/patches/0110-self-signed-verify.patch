@@ -1,0 +1,35 @@
+diff --git a/Scripts/verify-signature.sh b/Scripts/verify-signature.sh
+index b5a09d8cbd283c1d82b860fc2dc623b69856c454..6ca5ece77fa61e67fb22b79193e0fec4b855487c 100755
+--- a/Scripts/verify-signature.sh
++++ b/Scripts/verify-signature.sh
+@@ -58,6 +58,8 @@ for PAIR in "${RESOURCE_ENTITLEMENTS[@]}"; do
+ done
+ 
+ # iCloud Sync: AMFI refuses these entitlements without the profile, and a wrong one syncs nowhere.
++# Roseblud: a self-signed build carries neither the profile nor iCloud entitlements, so it has nothing to check.
++if [ -f "$APP/Contents/embedded.provisionprofile" ] || grep -q icloud-container "$ENTITLEMENTS"; then
+ [ -f "$APP/Contents/embedded.provisionprofile" ] || fail "$NAME.app: no embedded provisioning profile"
+ entitlement() { /usr/libexec/PlistBuddy -c "Print :$1" "$ENTITLEMENTS" 2>/dev/null; }
+ [ "$(entitlement com.apple.developer.icloud-container-identifiers:0)" = "iCloud.$APP_ID" ] ||
+@@ -66,6 +68,7 @@ entitlement() { /usr/libexec/PlistBuddy -c "Print :$1" "$ENTITLEMENTS" 2>/dev/nu
+     fail "$NAME.app: iCloud is not set to Production"
+ [ "$(entitlement com.apple.developer.aps-environment)" = production ] ||
+     fail "$NAME.app: push is not set to production"
++fi
+ 
+ if [ "$STATUS" -eq 0 ]; then
+     echo "✓ $NAME.app is notarizable, its prompts are entitled and it can reach iCloud"
+diff --git a/docs/signing.md b/docs/signing.md
+index c28c9d31630eb7119018fd475dfbb28e1f2e6679..9957532c7898eaa74ffc9b6c1566ba4a8e6abcf2 100644
+--- a/docs/signing.md
++++ b/docs/signing.md
+@@ -98,7 +98,8 @@ embedded provisioning profile authorizes them. So a build claims them only when
+   build.
+ - **Releases** pass `Tinycast/TinycastCloud.entitlements` and the channel's Developer ID profile,
+   committed in `Config/Profiles/` (a profile holds no secret). `verify-signature.sh` asserts the
+-  profile, the `iCloud.<bundle id>` container, Production and production push.
++  profile, the `iCloud.<bundle id>` container, Production and production push; a build with neither
++  the profile nor an iCloud entitlement, such as the Roseblud fork's self-signed release, skips them.
+ - **The Dev build** signs with Apple Development and the Dev profile through a gitignored
+   `Config/Local.xcconfig`, which every target's Debug configuration includes:
+ 
