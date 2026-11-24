@@ -43,6 +43,7 @@ enum SettingsAction: Codable, Sendable {
     case setExtensionPreference(String, key: String, ExtensionPreferenceValue?)
     case discardBackup(UUID)
     case checkForUpdates
+    case setUpdateTrack(UpdateTrack)  // tinycast-roseblud
     case showSupport
 }
 

@@ -13,6 +13,7 @@ struct UpdateCheckTests {
         try reportsInstalledVersionOnce()
         try await reportsWhyTheCheckFailed()
         classifiesRateLimits()
+        try dropsACachedBetaOnStable()  // tinycast-roseblud
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
     }
@@ -182,11 +183,39 @@ struct UpdateCheckTests {
         try JSONSerialization.data(withJSONObject: cache).write(to: file)
     }
 
+    /// tinycast-roseblud: a beta cached on the Beta track is no offer once the track is Stable.
+    static func dropsACachedBetaOnStable() throws {
+        let file = makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let body = Data(
+            """
+            [{"tag_name":"v1.1.0-beta.3","prerelease":true,"draft":false,"assets":[
+                {"name":"Tinycast-1.1.0-beta.3.zip","size":100,
+                 "browser_download_url":"https://example.com/update.zip"}
+            ]}]
+            """.utf8)
+        guard
+            let beta = ReleaseFeed.newest(
+                from: body, channel: .stableAndBeta, architecture: .current)
+        else { fatalError("the fixture beta must be installable") }
+        let cache: [String: Any] = [
+            "lastCheckedAt": Date.distantPast.timeIntervalSinceReferenceDate,
+            "latest": try JSONSerialization.jsonObject(with: JSONEncoder().encode(beta))
+        ]
+        try JSONSerialization.data(withJSONObject: cache).write(to: file)
+        let store = UpdateCheckStore(
+            channel: .stable, track: .beta, runningVersion: AppVersion("1.0.0"), fileURL: file,
+            fetch: { Data() })
+        expect(store.update?.version == beta.version, "Beta offers the cached beta")
+        store.track = .stable
+        expect(store.update == nil, "Stable drops it before the next check")
+    }
+
     static func makeStore(
         file: URL, fixture: FetchFixture, running: AppVersion? = AppVersion("1.0.0")
     ) -> UpdateCheckStore {
         UpdateCheckStore(
-            channel: .stable, runningVersion: running, fileURL: file,
+            channel: .stable, track: .stable, runningVersion: running, fileURL: file,
             fetch: { try await fixture.fetch() })
     }
 

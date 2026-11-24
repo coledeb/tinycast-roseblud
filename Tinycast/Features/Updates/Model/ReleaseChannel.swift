@@ -4,6 +4,8 @@ import Foundation
 enum ReleaseChannel: Sendable {
     case stable
     case beta
+    /// tinycast-roseblud: a stable build following betas (`UpdateTrack`); takes releases and prereleases.
+    case stableAndBeta
     /// A local build. It has no release stream, and never updates itself.
     case development
 
@@ -22,6 +24,7 @@ enum ReleaseChannel: Sendable {
         switch self {
         case .stable: return !prerelease
         case .beta: return prerelease
+        case .stableAndBeta: return true
         case .development: return false
         }
     }
