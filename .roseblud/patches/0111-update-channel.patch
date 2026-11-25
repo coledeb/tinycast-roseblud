@@ -1,0 +1,693 @@
+diff --git a/Tests/UpdateCheckTests.swift b/Tests/UpdateCheckTests.swift
+index 183627af75808b50289778f5f8b0c4db08162e35..fa86e460c283989229065289183993f9db1dd4f4 100644
+--- a/Tests/UpdateCheckTests.swift
++++ b/Tests/UpdateCheckTests.swift
+@@ -13,6 +13,7 @@ struct UpdateCheckTests {
+         try reportsInstalledVersionOnce()
+         try await reportsWhyTheCheckFailed()
+         classifiesRateLimits()
++        try dropsACachedBetaOnStable()  // tinycast-roseblud
+         print("\(passes) passed, \(failures) failed")
+         if failures > 0 { exit(1) }
+     }
+@@ -182,11 +183,39 @@ struct UpdateCheckTests {
+         try JSONSerialization.data(withJSONObject: cache).write(to: file)
+     }
+ 
++    /// tinycast-roseblud: a beta cached on the Beta track is no offer once the track is Stable.
++    static func dropsACachedBetaOnStable() throws {
++        let file = makeFile()
++        defer { try? FileManager.default.removeItem(at: file) }
++        let body = Data(
++            """
++            [{"tag_name":"v1.1.0-beta.3","prerelease":true,"draft":false,"assets":[
++                {"name":"Tinycast-1.1.0-beta.3.zip","size":100,
++                 "browser_download_url":"https://example.com/update.zip"}
++            ]}]
++            """.utf8)
++        guard
++            let beta = ReleaseFeed.newest(
++                from: body, channel: .stableAndBeta, architecture: .current)
++        else { fatalError("the fixture beta must be installable") }
++        let cache: [String: Any] = [
++            "lastCheckedAt": Date.distantPast.timeIntervalSinceReferenceDate,
++            "latest": try JSONSerialization.jsonObject(with: JSONEncoder().encode(beta))
++        ]
++        try JSONSerialization.data(withJSONObject: cache).write(to: file)
++        let store = UpdateCheckStore(
++            channel: .stable, track: .beta, runningVersion: AppVersion("1.0.0"), fileURL: file,
++            fetch: { Data() })
++        expect(store.update?.version == beta.version, "Beta offers the cached beta")
++        store.track = .stable
++        expect(store.update == nil, "Stable drops it before the next check")
++    }
++
+     static func makeStore(
+         file: URL, fixture: FetchFixture, running: AppVersion? = AppVersion("1.0.0")
+     ) -> UpdateCheckStore {
+         UpdateCheckStore(
+-            channel: .stable, runningVersion: running, fileURL: file,
++            channel: .stable, track: .stable, runningVersion: running, fileURL: file,
+             fetch: { try await fixture.fetch() })
+     }
+ 
+diff --git a/Tests/UpdatesTests.swift b/Tests/UpdatesTests.swift
+index 7efff4c5eba4d1575068fa583e12f6eb26283340..ef7d8cf36c6181d8968838dba14ba592097b9cf6 100644
+--- a/Tests/UpdatesTests.swift
++++ b/Tests/UpdatesTests.swift
+@@ -23,6 +23,7 @@ struct UpdatesTests {
+         roundTripsVersionsThroughJSON()
+         derivesChannels()
+         picksNewestForChannel()
++        followsBetasOnTheBetaTrack()  // tinycast-roseblud
+         picksTheZipThisMacCanRun()
+         rejectsUnusableFeeds()
+         offersOnlyWhatIsWorthInstalling()
+@@ -171,6 +172,46 @@ struct UpdatesTests {
+             "a local build is offered nothing, however new the feed is")
+     }
+ 
++    /// tinycast-roseblud: About's Stable / Beta picker (`UpdateTrack`).
++    static func followsBetasOnTheBetaTrack() {
++        expect(UpdateTrack(saved: nil) == .stable, "an unset track is Stable")
++        expect(UpdateTrack(saved: "nightly") == .stable, "an unreadable track is Stable")
++        expect(UpdateTrack(saved: "beta") == .beta, "a saved Beta reads back")
++        expect(ReleaseChannel.stable.following(.stable) == .stable, "Stable keeps the stable channel")
++        expect(ReleaseChannel.stable.following(.beta) == .stableAndBeta, "Beta widens it")
++        expect(
++            ReleaseChannel.beta.following(.beta) == .beta
++                && ReleaseChannel.development.following(.beta) == .development,
++            "the track never changes upstream's beta app or a local build")
++        expect(
++            ReleaseChannel.stableAndBeta.accepts(prerelease: true)
++                && ReleaseChannel.stableAndBeta.accepts(prerelease: false),
++            "following betas takes prereleases and releases")
++        expect(ReleaseChannel.stableAndBeta.updatesItself, "following betas still updates")
++
++        let betaAhead = feed(
++            entry(tag: "v0.3.0", prerelease: false),
++            entry(tag: "v0.4.0-beta.2", prerelease: true))
++        expect(
++            ReleaseFeed.newest(from: betaAhead, channel: .stableAndBeta, architecture: .appleSilicon)?
++                .version == AppVersion("0.4.0-beta.2"),
++            "Beta takes a beta newer than the last release")
++        let releaseAhead = feed(
++            entry(tag: "v0.4.0-beta.2", prerelease: true),
++            entry(tag: "v0.4.0", prerelease: false))
++        let superseding = ReleaseFeed.newest(
++            from: releaseAhead, channel: .stableAndBeta, architecture: .appleSilicon)
++        expect(superseding?.version == AppVersion("0.4.0"), "a release supersedes its betas on Beta")
++        expect(
++            ReleaseFeed.offer(superseding, running: AppVersion("0.4.0-beta.2")!) != nil,
++            "and is offered over the installed beta")
++        expect(
++            ReleaseFeed.offer(
++                ReleaseFeed.newest(from: betaAhead, channel: .stable, architecture: .appleSilicon),
++                running: AppVersion("0.4.0-beta.2")!) == nil,
++            "leaving Beta never offers an older release over the installed beta")
++    }
++
+     static func rejectsUnusableFeeds() {
+         expect(
+             ReleaseFeed.newest(from: Data(), channel: .stable, architecture: .appleSilicon) == nil,
+diff --git a/Tinycast/Features/Settings/Service/MainAppStatus.swift b/Tinycast/Features/Settings/Service/MainAppStatus.swift
+index a718fc8e81f0e78780291665062a0cd80338192b..7292210f08329fe2c89caaacc863768a612ed3ce 100644
+--- a/Tinycast/Features/Settings/Service/MainAppStatus.swift
++++ b/Tinycast/Features/Settings/Service/MainAppStatus.swift
+@@ -50,6 +50,7 @@ struct MainAppStatus: Codable, Equatable, Sendable {
+         var isChecking = false
+         var lastCheckedAt: Date?
+         var availableVersion: String?
++        var track: UpdateTrack = .stable  // tinycast-roseblud
+     }
+ 
+     var hiddenCommands: Set<CommandID> = []
+diff --git a/Tinycast/Features/Settings/Service/SettingsAction.swift b/Tinycast/Features/Settings/Service/SettingsAction.swift
+index 56bea689acf4e7d802f56d210ee74c55ae2816e3..4263880eb7022688836d75a2466b3d94db8133d7 100644
+--- a/Tinycast/Features/Settings/Service/SettingsAction.swift
++++ b/Tinycast/Features/Settings/Service/SettingsAction.swift
+@@ -43,6 +43,7 @@ enum SettingsAction: Codable, Sendable {
+     case setExtensionPreference(String, key: String, ExtensionPreferenceValue?)
+     case discardBackup(UUID)
+     case checkForUpdates
++    case setUpdateTrack(UpdateTrack)  // tinycast-roseblud
+     case showSupport
+ }
+ 
+diff --git a/Tinycast/Features/Settings/Service/SettingsProcessController.swift b/Tinycast/Features/Settings/Service/SettingsProcessController.swift
+index d4aadd86f7a9927bfa3e11eda04ab8d2e5896177..42e9bf22e5f54a835c6dfc6d36cfeb9614739568 100644
+--- a/Tinycast/Features/Settings/Service/SettingsProcessController.swift
++++ b/Tinycast/Features/Settings/Service/SettingsProcessController.swift
+@@ -236,6 +236,8 @@ final class SettingsProcessController {
+             if stagedBackup?.preview.id == id { discardStagedBackup() }
+         case .checkForUpdates:
+             core.updateCoordinator.checkForUpdates()
++        case .setUpdateTrack(let track):
++            core.setUpdateTrack(track)
+         case .showSupport:
+             core.supportCoordinator.showSupport()
+         }
+@@ -427,7 +429,8 @@ final class SettingsProcessController {
+             mcpAuthentication: core.mcpOAuth.statuses,
+             updates: MainAppStatus.Updates(
+                 updatesItself: updates.updatesItself, isChecking: updates.isChecking,
+-                lastCheckedAt: updates.lastCheckedAt, availableVersion: updates.availableVersion?.description),
++                lastCheckedAt: updates.lastCheckedAt, availableVersion: updates.availableVersion?.description,
++                track: core.updateChecker.track),
+             extensions: extensionsStatus())
+     }
+ 
+diff --git a/Tinycast/Features/Settings/SettingsSearchCatalog.swift b/Tinycast/Features/Settings/SettingsSearchCatalog.swift
+index 88432898a947315aed5090b1ec8ba8edf304fdee..6d6fd8927fb643a9379318874adcf21952b5b367 100644
+--- a/Tinycast/Features/Settings/SettingsSearchCatalog.swift
++++ b/Tinycast/Features/Settings/SettingsSearchCatalog.swift
+@@ -740,6 +740,8 @@ enum SettingsSearchCatalog {
+         .init(
+             .aboutAbout, "Check for Updates",
+             keywords: ["version", "upgrade", "release"]),
++        .init(  // tinycast-roseblud
++            .aboutAbout, "Update Channel", keywords: ["beta", "stable", "prerelease"]),
+         .init(
+             group: .aboutLinks, "Links",
+             keywords: ["github", "source", "issues", "website"]),
+diff --git a/Tinycast/Features/Updates/Model/ReleaseChannel.swift b/Tinycast/Features/Updates/Model/ReleaseChannel.swift
+index 4dcc7fe401d157663cef50d3affb46928821a831..6165dc60423127d9a5524c770d8b2c4d3592d0ad 100644
+--- a/Tinycast/Features/Updates/Model/ReleaseChannel.swift
++++ b/Tinycast/Features/Updates/Model/ReleaseChannel.swift
+@@ -4,6 +4,8 @@ import Foundation
+ enum ReleaseChannel: Sendable {
+     case stable
+     case beta
++    /// tinycast-roseblud: a stable build following betas (`UpdateTrack`); takes releases and prereleases.
++    case stableAndBeta
+     /// A local build. It has no release stream, and never updates itself.
+     case development
+ 
+@@ -22,6 +24,7 @@ enum ReleaseChannel: Sendable {
+         switch self {
+         case .stable: return !prerelease
+         case .beta: return prerelease
++        case .stableAndBeta: return true
+         case .development: return false
+         }
+     }
+diff --git a/Tinycast/Features/Updates/Model/UpdateTrack.swift b/Tinycast/Features/Updates/Model/UpdateTrack.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..cf23851e6aa1b2d6278fab109ab1718bdbb0d417
+--- /dev/null
++++ b/Tinycast/Features/Updates/Model/UpdateTrack.swift
+@@ -0,0 +1,27 @@
++import Foundation
++
++/// tinycast-roseblud: which releases a stable build takes, picked under About → Check for Updates.
++/// Beta takes prereleases as well as releases, so a release that supersedes the last beta still
++/// arrives as the newest version; Stable takes releases only. Saved by the main app in the plain
++/// `rosebludUpdateChannel` default. See docs/features/updates.md.
++enum UpdateTrack: String, CaseIterable, Identifiable, Codable, Sendable {
++    case stable
++    case beta
++
++    static let defaultsKey = "rosebludUpdateChannel"
++
++    /// Unset or unreadable is Stable, so nobody follows betas without choosing to.
++    init(saved value: String?) {
++        self = value.flatMap(Self.init(rawValue:)) ?? .stable
++    }
++
++    var id: String { rawValue }
++}
++
++extension ReleaseChannel {
++    /// The channel a check filters by: a stable build following betas takes both streams.
++    /// Upstream's beta app and local builds keep their own rules whatever the track says.
++    func following(_ track: UpdateTrack) -> ReleaseChannel {
++        self == .stable && track == .beta ? .stableAndBeta : self
++    }
++}
+diff --git a/Tinycast/Features/Updates/Service/UpdateCheckStore.swift b/Tinycast/Features/Updates/Service/UpdateCheckStore.swift
+index 4f336f02d18085aa043075b3d97611028bba2813..74d18a6319224806ccf3df712fab2b749c186a83 100644
+--- a/Tinycast/Features/Updates/Service/UpdateCheckStore.swift
++++ b/Tinycast/Features/Updates/Service/UpdateCheckStore.swift
+@@ -5,7 +5,7 @@ import Foundation
+ @Observable
+ final class UpdateCheckStore {
+     private nonisolated static let endpoint = URL(
+-        string: "https://api.github.com/repos/\(ReleaseFeed.repository)/releases?per_page=20")!
++        string: "https://api.github.com/repos/\(ReleaseFeed.repository)/releases?per_page=100")!
+     /// Measured from `lastCheckedAt`, so relaunching never re-asks GitHub.
+     private static let refreshInterval: TimeInterval = 12 * 3600
+     /// Shorter retry, so a machine offline at launch sees a release soon after it reconnects.
+@@ -16,6 +16,8 @@ final class UpdateCheckStore {
+     private static let wakeTolerance = Duration.seconds(15)
+ 
+     let channel: ReleaseChannel
++    /// tinycast-roseblud: set by the main app when About's channel picker changes.
++    var track: UpdateTrack
+     let runningVersion: AppVersion?
+ 
+     /// The newest release on this channel, whether or not it is newer than what is running.
+@@ -35,12 +37,15 @@ final class UpdateCheckStore {
+ 
+     init(
+         channel: ReleaseChannel = ReleaseChannel(bundleID: Bundle.main.bundleIdentifier),
++        track: UpdateTrack = UpdateTrack(
++            saved: UserDefaults.standard.string(forKey: UpdateTrack.defaultsKey)),
+         runningVersion: AppVersion? = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)
+             .flatMap(AppVersion.init),
+         fileURL: URL = AppPaths.caches().appendingPathComponent("update-check.json"),
+         fetch: @escaping @Sendable () async throws -> Data = UpdateCheckStore.body
+     ) {
+         self.channel = channel
++        self.track = track
+         self.runningVersion = runningVersion
+         self.fileURL = fileURL
+         self.fetch = fetch
+@@ -57,6 +62,9 @@ final class UpdateCheckStore {
+     /// Newer than what is running.
+     var update: AvailableRelease? {
+         guard let runningVersion else { return nil }
++        // tinycast-roseblud: a cached beta is no offer once the track goes back to Stable.
++        guard latest.map({ channel.following(track).accepts(prerelease: $0.version.isPrerelease) }) != false
++        else { return nil }
+         return ReleaseFeed.offer(latest, running: runningVersion)
+     }
+ 
+@@ -86,7 +94,7 @@ final class UpdateCheckStore {
+         defer { checksInFlight -= 1 }
+         let data = try await fetch()
+         try Task.checkCancellation()
+-        latest = ReleaseFeed.newest(from: data, channel: channel, architecture: .current)
++        latest = ReleaseFeed.newest(from: data, channel: channel.following(track), architecture: .current)
+         lastCheckedAt = Date()
+         persist()
+     }
+diff --git a/Tinycast/Features/Updates/UI/UpdateTrackSwitch.swift b/Tinycast/Features/Updates/UI/UpdateTrackSwitch.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..9d68907a34f565e34bfc17a834858e7686ad06ae
+--- /dev/null
++++ b/Tinycast/Features/Updates/UI/UpdateTrackSwitch.swift
+@@ -0,0 +1,13 @@
++import Foundation
++
++extension AppCore {
++    /// tinycast-roseblud: About's channel picker, applied in the main app, which owns the updater.
++    /// Saves the choice, lets the checker drop a cached offer the new track refuses, then checks at
++    /// once, so the answer (an update, or "up to date") shows right after the switch.
++    func setUpdateTrack(_ track: UpdateTrack) {
++        UserDefaults.standard.set(track.rawValue, forKey: UpdateTrack.defaultsKey)
++        guard updateChecker.track != track else { return }
++        updateChecker.track = track
++        updateCoordinator.checkForUpdates()
++    }
++}
+diff --git a/Tinycast/Resources/Localizable.xcstrings b/Tinycast/Resources/Localizable.xcstrings
+index f8af9107689aa84a2b68b72badd9413c19829f1b..20487b438694fcabc7382e07ac63a7f1ce153f3e 100644
+--- a/Tinycast/Resources/Localizable.xcstrings
++++ b/Tinycast/Resources/Localizable.xcstrings
+@@ -29195,6 +29195,110 @@
+         }
+       }
+     },
++    "Beta" : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Beta"
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Beta"
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Bêta"
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "ベータ"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "베타"
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Beta"
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Бета"
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "测试版"
++          }
++        }
++      }
++    },
++    "Betas built on upstream Tinycast's, and any newer release. Betas share your data and settings." : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Betas auf Basis der Betas des ursprünglichen Tinycast und jedes neuere Release. Betas nutzen deine Daten und Einstellungen mit."
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Betas basadas en las del Tinycast original y cualquier versión más reciente. Las betas comparten tus datos y ajustes."
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Bêtas construites sur celles du Tinycast d’origine, et toute version plus récente. Les bêtas partagent vos données et réglages."
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "本家 Tinycast のベータを元にしたベータと、より新しいリリース。ベータはデータと設定を共有します。"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "원본 Tinycast 베타를 기반으로 한 베타와 더 새로운 릴리스를 받습니다. 베타는 데이터와 설정을 공유합니다."
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Betas baseadas nas do Tinycast original e qualquer versão mais nova. As betas compartilham seus dados e ajustes."
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Беты на основе бет оригинального Tinycast и любой более новый релиз. Беты используют ваши данные и настройки."
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "基于原版 Tinycast 测试版构建的测试版，以及任何更新的正式版。测试版与你共用数据和设置。"
++          }
++        }
++      }
++    },
+     "Between tiled windows and screen edges." : {
+       "localizations" : {
+         "de" : {
+@@ -103872,6 +103976,58 @@
+         }
+       }
+     },
++    "Releases only. Leaving Beta keeps the installed beta until a newer release ships." : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Nur Releases. Beim Verlassen von Beta bleibt die installierte Beta, bis ein neueres Release erscheint."
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Solo versiones estables. Al dejar Beta, se mantiene la beta instalada hasta que salga una versión más reciente."
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Versions stables uniquement. En quittant Bêta, la bêta installée reste jusqu’à la sortie d’une version plus récente."
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "正式リリースのみ。ベータをやめても、より新しいリリースが出るまでインストール済みのベータを使い続けます。"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "정식 릴리스만 받습니다. 베타를 해제해도 더 새로운 릴리스가 나올 때까지 설치된 베타가 유지됩니다."
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Somente versões estáveis. Ao sair do Beta, a beta instalada continua até sair uma versão mais nova."
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Только релизы. После выхода из бета-канала установленная бета остаётся, пока не выйдет более новый релиз."
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "仅正式版。离开测试版后，已安装的测试版会保留，直到有更新的正式版发布。"
++          }
++        }
++      }
++    },
+     "Releasing it when idle frees memory. The next dictation takes a moment longer." : {
+       "localizations" : {
+         "de" : {
+@@ -119996,6 +120152,58 @@
+         }
+       }
+     },
++    "Stable" : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Stabil"
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Estable"
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Stable"
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "安定版"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "안정"
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Estável"
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Стабильный"
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "稳定版"
++          }
++        }
++      }
++    },
+     "Stack" : {
+       "comment" : "Room layout name",
+       "localizations" : {
+@@ -141599,6 +141807,58 @@
+         }
+       }
+     },
++    "Update Channel" : {
++      "localizations" : {
++        "de" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Update-Kanal"
++          }
++        },
++        "es" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Canal de actualizaciones"
++          }
++        },
++        "fr" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Canal de mise à jour"
++          }
++        },
++        "ja" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "アップデートチャンネル"
++          }
++        },
++        "ko" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "업데이트 채널"
++          }
++        },
++        "pt" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Canal de atualizações"
++          }
++        },
++        "ru" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "Канал обновлений"
++          }
++        },
++        "zh-Hans" : {
++          "stringUnit" : {
++            "state" : "translated",
++            "value" : "更新渠道"
++          }
++        }
++      }
++    },
+     "Update failed" : {
+       "localizations" : {
+         "de" : {
+diff --git a/Tinycast/Windows/About/AboutView.swift b/Tinycast/Windows/About/AboutView.swift
+index 47350ef007225e490e80822fe82dfcad1828f8d4..d9a8039d4b1150a5b6303e172d820f484441da3c 100644
+--- a/Tinycast/Windows/About/AboutView.swift
++++ b/Tinycast/Windows/About/AboutView.swift
+@@ -34,6 +34,7 @@ struct AboutView: View {
+                 }
+                 .settingsAnchor(.aboutAbout)
+                 updates
++                UpdateTrackSection()  // tinycast-roseblud
+                 links
+                 support
+             }
+diff --git a/Tinycast/Windows/About/UpdateTrackSection.swift b/Tinycast/Windows/About/UpdateTrackSection.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..0f597585e63f640f1a427221287c7f7450a67afb
+--- /dev/null
++++ b/Tinycast/Windows/About/UpdateTrackSection.swift
+@@ -0,0 +1,45 @@
++import SwiftUI
++
++/// tinycast-roseblud: About's Stable / Beta picker, below Check for Updates. The main app owns the
++/// choice: the pane sends it as a `SettingsAction` and reads it back from `MainAppStatus`.
++struct UpdateTrackSection: View {
++    @Environment(MainAppLink.self) private var mainApp
++    /// Shown until the main app's status catches up, so the picker never flicks back.
++    @State private var pending: UpdateTrack?
++
++    var body: some View {
++        let updates = mainApp.status.updates
++        if updates.updatesItself {
++            Section {
++                Picker(selection: selection(updates.track)) {
++                    Text("Stable").tag(UpdateTrack.stable)
++                    Text("Beta").tag(UpdateTrack.beta)
++                } label: {
++                    SettingsRowTitle(.aboutAbout, "Update Channel")
++                    Text(Self.detail(pending ?? updates.track))
++                }
++            }
++            .onChange(of: updates.track) { _, track in
++                if pending == track { pending = nil }
++            }
++        }
++    }
++
++    private func selection(_ current: UpdateTrack) -> Binding<UpdateTrack> {
++        Binding(
++            get: { pending ?? current },
++            set: { track in
++                pending = track
++                mainApp.send(.setUpdateTrack(track))
++            })
++    }
++
++    private static func detail(_ track: UpdateTrack) -> LocalizedStringKey {
++        switch track {
++        case .stable:
++            "Releases only. Leaving Beta keeps the installed beta until a newer release ships."
++        case .beta:
++            "Betas built on upstream Tinycast's, and any newer release. Betas share your data and settings."
++        }
++    }
++}
+diff --git a/docs/features/updates.md b/docs/features/updates.md
+index 0158aeed12cef8b3ee1062e4b7a7ffab9fcba9f2..7bf51b93b781b502e58b5f07a555f6b6882e4ebf 100644
+--- a/docs/features/updates.md
++++ b/docs/features/updates.md
+@@ -31,7 +31,9 @@ uninstall` and `brew list` keep working unchanged.
+   refuse a bundle the signature already proves is ours.
+ - **A build only ever updates within its own channel.** The channels are separate bundle ids installed
+   side by side; crossing would mean installing a different app. `com.abueammar.tinycast.dev` never updates
+-  at all, and does not advertise the command.
++  at all, and does not advertise the command. Roseblud's one exception is its own track: a
++  `com.tinycast.app` build on the Beta track takes prereleases too, since this fork ships both
++  streams under one bundle id (see below).
+ - **Nothing is installed unless every check passes.** Bundle id, version and signature are all checked
+   on the expanded copy, and the running app survives any failure untouched.
+ - **The swap waits for quit.** A verified update stays staged until Tinycast quits, by Relaunch or
+@@ -89,6 +91,20 @@ the header row. It cannot reuse `ExtensionToastPill`, because extension views st
+ Roseblud releases retain `com.tinycast.app` and use the regular release zip, with the same bundle-id
+ and signature checks as every other stable build. Development and unknown bundle ids never update.
+ 
++**Roseblud's update channel.** This fork ships its betas (`vX.Y.Z-beta.N` prereleases, built on
++upstream Tinycast's betas by `roseblud-beta.yml`) under the same `com.tinycast.app` bundle id and
++name as its releases, so one installed app can follow either. Settings → About → *Update Channel*
++(`UpdateTrackSection`, below Check for Updates) picks Stable or Beta, saved as `UpdateTrack` in the
++plain `rosebludUpdateChannel` default (unset is Stable). The pane only asks: it sends
++`SettingsAction.setUpdateTrack`, and the main app saves the choice, sets `UpdateCheckStore.track`
++and runs Check for Updates at once; the pane reads the choice back from `MainAppStatus.Updates.track`.
++A check filters by `ReleaseChannel.following(track)`: Stable stays `.stable`, Beta widens it to
++`.stableAndBeta`, which takes releases and prereleases alike, so the newest version wins and a
++release that supersedes the installed beta (`0.13.0` over `0.13.0-beta.145`) is offered as usual.
++Leaving Beta never downgrades: the installed beta stays until a release newer than it ships, and a
++cached beta stops being offered at once. The feed is read 100 releases deep, so a run of betas never
++pushes the newest release off the page. Upstream's own bundle ids ignore the track.
++
+ `AppVersion` parses `MAJOR.MINOR.PATCH` and `MAJOR.MINOR.PATCH-beta.N` with semver precedence: a
+ prerelease sorts below the release it leads to, and `beta.10` above `beta.9`. Everything else parses
+ to nil, so an off-shape tag can never be offered as an update. A release whose tag disagrees with
