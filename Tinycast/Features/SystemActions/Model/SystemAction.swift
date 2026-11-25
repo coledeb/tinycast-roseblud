@@ -9,6 +9,8 @@ struct SystemAction: Identifiable, Hashable, Sendable {
         case shutDown = "shut-down"
         case logOut = "log-out"
         case showScreenSaver = "show-screen-saver"
+        /// tinycast-space: Raycast's Confetti. See ConfettiOverlay.
+        case confetti
         case playPause = "play-pause"
         case nextTrack = "next-track"
         case previousTrack = "previous-track"
@@ -86,6 +88,7 @@ enum SystemActionCatalog {
         case .shutDown: return "Shut Down"
         case .logOut: return "Log Out"
         case .showScreenSaver: return "Show Screen Saver"
+        case .confetti: return "Confetti"  // tinycast-space
         case .playPause: return "Play / Pause"
         case .nextTrack: return "Next Track"
         case .previousTrack: return "Previous Track"
@@ -123,6 +126,7 @@ enum SystemActionCatalog {
         case .shutDown: return "power"
         case .logOut: return "rectangle.portrait.and.arrow.right.fill"
         case .showScreenSaver: return "rectangle.inset.filled"
+        case .confetti: return "party.popper.fill"  // tinycast-space
         case .playPause: return "playpause.fill"
         case .nextTrack: return "forward.end.fill"
         case .previousTrack: return "backward.end.fill"
@@ -153,6 +157,7 @@ enum SystemActionCatalog {
     private static func tint(for id: SystemAction.ID) -> IconTint {
         switch id {
         case .lockScreen, .toggleAppearance: return .graphite
+        case .confetti: return .yellow  // tinycast-space
         case .sleep, .sleepDisplays: return .indigo
         case .restart: return .orange
         case .showScreenSaver: return .cyan
