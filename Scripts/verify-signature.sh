@@ -58,6 +58,8 @@ for PAIR in "${RESOURCE_ENTITLEMENTS[@]}"; do
 done
 
 # iCloud Sync: AMFI refuses these entitlements without the profile, and a wrong one syncs nowhere.
+# Roseblud: a self-signed build carries neither the profile nor iCloud entitlements, so it has nothing to check.
+if [ -f "$APP/Contents/embedded.provisionprofile" ] || grep -q icloud-container "$ENTITLEMENTS"; then
 [ -f "$APP/Contents/embedded.provisionprofile" ] || fail "$NAME.app: no embedded provisioning profile"
 entitlement() { /usr/libexec/PlistBuddy -c "Print :$1" "$ENTITLEMENTS" 2>/dev/null; }
 [ "$(entitlement com.apple.developer.icloud-container-identifiers:0)" = "iCloud.$APP_ID" ] ||
@@ -66,6 +68,7 @@ entitlement() { /usr/libexec/PlistBuddy -c "Print :$1" "$ENTITLEMENTS" 2>/dev/nu
     fail "$NAME.app: iCloud is not set to Production"
 [ "$(entitlement com.apple.developer.aps-environment)" = production ] ||
     fail "$NAME.app: push is not set to production"
+fi
 
 if [ "$STATUS" -eq 0 ]; then
     echo "✓ $NAME.app is notarizable, its prompts are entitled and it can reach iCloud"

@@ -98,7 +98,8 @@ embedded provisioning profile authorizes them. So a build claims them only when 
   build.
 - **Releases** pass `Tinycast/TinycastCloud.entitlements` and the channel's Developer ID profile,
   committed in `Config/Profiles/` (a profile holds no secret). `verify-signature.sh` asserts the
-  profile, the `iCloud.<bundle id>` container, Production and production push.
+  profile, the `iCloud.<bundle id>` container, Production and production push; a build with neither
+  the profile nor an iCloud entitlement, such as the Roseblud fork's self-signed release, skips them.
 - **The Dev build** signs with Apple Development and the Dev profile through a gitignored
   `Config/Local.xcconfig`, which every target's Debug configuration includes:
 
