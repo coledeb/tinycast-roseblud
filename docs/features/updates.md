@@ -31,7 +31,9 @@ uninstall` and `brew list` keep working unchanged.
   refuse a bundle the signature already proves is ours.
 - **A build only ever updates within its own channel.** The channels are separate bundle ids installed
   side by side; crossing would mean installing a different app. `com.abueammar.tinycast.dev` never updates
-  at all, and does not advertise the command.
+  at all, and does not advertise the command. Roseblud's one exception is its own track: a
+  `com.tinycast.app` build on the Beta track takes prereleases too, since this fork ships both
+  streams under one bundle id (see below).
 - **Nothing is installed unless every check passes.** Bundle id, version and signature are all checked
   on the expanded copy, and the running app survives any failure untouched.
 - **The swap waits for quit.** A verified update stays staged until Tinycast quits, by Relaunch or
@@ -88,6 +90,20 @@ the header row. It cannot reuse `ExtensionToastPill`, because extension views st
 
 Roseblud releases retain `com.tinycast.app` and use the regular release zip, with the same bundle-id
 and signature checks as every other stable build. Development and unknown bundle ids never update.
+
+**Roseblud's update channel.** This fork ships its betas (`vX.Y.Z-beta.N` prereleases, built on
+upstream Tinycast's betas by `roseblud-beta.yml`) under the same `com.tinycast.app` bundle id and
+name as its releases, so one installed app can follow either. Settings → About → *Update Channel*
+(`UpdateTrackSection`, below Check for Updates) picks Stable or Beta, saved as `UpdateTrack` in the
+plain `rosebludUpdateChannel` default (unset is Stable). The pane only asks: it sends
+`SettingsAction.setUpdateTrack`, and the main app saves the choice, sets `UpdateCheckStore.track`
+and runs Check for Updates at once; the pane reads the choice back from `MainAppStatus.Updates.track`.
+A check filters by `ReleaseChannel.following(track)`: Stable stays `.stable`, Beta widens it to
+`.stableAndBeta`, which takes releases and prereleases alike, so the newest version wins and a
+release that supersedes the installed beta (`0.13.0` over `0.13.0-beta.145`) is offered as usual.
+Leaving Beta never downgrades: the installed beta stays until a release newer than it ships, and a
+cached beta stops being offered at once. The feed is read 100 releases deep, so a run of betas never
+pushes the newest release off the page. Upstream's own bundle ids ignore the track.
 
 `AppVersion` parses `MAJOR.MINOR.PATCH` and `MAJOR.MINOR.PATCH-beta.N` with semver precedence: a
 prerelease sorts below the release it leads to, and `beta.10` above `beta.9`. Everything else parses

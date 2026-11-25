@@ -5,7 +5,7 @@ import Foundation
 @Observable
 final class UpdateCheckStore {
     private nonisolated static let endpoint = URL(
-        string: "https://api.github.com/repos/\(ReleaseFeed.repository)/releases?per_page=20")!
+        string: "https://api.github.com/repos/\(ReleaseFeed.repository)/releases?per_page=100")!
     /// Measured from `lastCheckedAt`, so relaunching never re-asks GitHub.
     private static let refreshInterval: TimeInterval = 12 * 3600
     /// Shorter retry, so a machine offline at launch sees a release soon after it reconnects.
@@ -16,6 +16,8 @@ final class UpdateCheckStore {
     private static let wakeTolerance = Duration.seconds(15)
 
     let channel: ReleaseChannel
+    /// tinycast-roseblud: set by the main app when About's channel picker changes.
+    var track: UpdateTrack
     let runningVersion: AppVersion?
 
     /// The newest release on this channel, whether or not it is newer than what is running.
@@ -35,12 +37,15 @@ final class UpdateCheckStore {
 
     init(
         channel: ReleaseChannel = ReleaseChannel(bundleID: Bundle.main.bundleIdentifier),
+        track: UpdateTrack = UpdateTrack(
+            saved: UserDefaults.standard.string(forKey: UpdateTrack.defaultsKey)),
         runningVersion: AppVersion? = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)
             .flatMap(AppVersion.init),
         fileURL: URL = AppPaths.caches().appendingPathComponent("update-check.json"),
         fetch: @escaping @Sendable () async throws -> Data = UpdateCheckStore.body
     ) {
         self.channel = channel
+        self.track = track
         self.runningVersion = runningVersion
         self.fileURL = fileURL
         self.fetch = fetch
@@ -57,6 +62,9 @@ final class UpdateCheckStore {
     /// Newer than what is running.
     var update: AvailableRelease? {
         guard let runningVersion else { return nil }
+        // tinycast-roseblud: a cached beta is no offer once the track goes back to Stable.
+        guard latest.map({ channel.following(track).accepts(prerelease: $0.version.isPrerelease) }) != false
+        else { return nil }
         return ReleaseFeed.offer(latest, running: runningVersion)
     }
 
@@ -86,7 +94,7 @@ final class UpdateCheckStore {
         defer { checksInFlight -= 1 }
         let data = try await fetch()
         try Task.checkCancellation()
-        latest = ReleaseFeed.newest(from: data, channel: channel, architecture: .current)
+        latest = ReleaseFeed.newest(from: data, channel: channel.following(track), architecture: .current)
         lastCheckedAt = Date()
         persist()
     }

@@ -23,6 +23,7 @@ struct UpdatesTests {
         roundTripsVersionsThroughJSON()
         derivesChannels()
         picksNewestForChannel()
+        followsBetasOnTheBetaTrack()  // tinycast-roseblud
         picksTheZipThisMacCanRun()
         rejectsUnusableFeeds()
         offersOnlyWhatIsWorthInstalling()
@@ -169,6 +170,46 @@ struct UpdatesTests {
         expect(
             ReleaseFeed.newest(from: body, channel: .development, architecture: .appleSilicon) == nil,
             "a local build is offered nothing, however new the feed is")
+    }
+
+    /// tinycast-roseblud: About's Stable / Beta picker (`UpdateTrack`).
+    static func followsBetasOnTheBetaTrack() {
+        expect(UpdateTrack(saved: nil) == .stable, "an unset track is Stable")
+        expect(UpdateTrack(saved: "nightly") == .stable, "an unreadable track is Stable")
+        expect(UpdateTrack(saved: "beta") == .beta, "a saved Beta reads back")
+        expect(ReleaseChannel.stable.following(.stable) == .stable, "Stable keeps the stable channel")
+        expect(ReleaseChannel.stable.following(.beta) == .stableAndBeta, "Beta widens it")
+        expect(
+            ReleaseChannel.beta.following(.beta) == .beta
+                && ReleaseChannel.development.following(.beta) == .development,
+            "the track never changes upstream's beta app or a local build")
+        expect(
+            ReleaseChannel.stableAndBeta.accepts(prerelease: true)
+                && ReleaseChannel.stableAndBeta.accepts(prerelease: false),
+            "following betas takes prereleases and releases")
+        expect(ReleaseChannel.stableAndBeta.updatesItself, "following betas still updates")
+
+        let betaAhead = feed(
+            entry(tag: "v0.3.0", prerelease: false),
+            entry(tag: "v0.4.0-beta.2", prerelease: true))
+        expect(
+            ReleaseFeed.newest(from: betaAhead, channel: .stableAndBeta, architecture: .appleSilicon)?
+                .version == AppVersion("0.4.0-beta.2"),
+            "Beta takes a beta newer than the last release")
+        let releaseAhead = feed(
+            entry(tag: "v0.4.0-beta.2", prerelease: true),
+            entry(tag: "v0.4.0", prerelease: false))
+        let superseding = ReleaseFeed.newest(
+            from: releaseAhead, channel: .stableAndBeta, architecture: .appleSilicon)
+        expect(superseding?.version == AppVersion("0.4.0"), "a release supersedes its betas on Beta")
+        expect(
+            ReleaseFeed.offer(superseding, running: AppVersion("0.4.0-beta.2")!) != nil,
+            "and is offered over the installed beta")
+        expect(
+            ReleaseFeed.offer(
+                ReleaseFeed.newest(from: betaAhead, channel: .stable, architecture: .appleSilicon),
+                running: AppVersion("0.4.0-beta.2")!) == nil,
+            "leaving Beta never offers an older release over the installed beta")
     }
 
     static func rejectsUnusableFeeds() {

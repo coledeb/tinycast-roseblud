@@ -50,6 +50,7 @@ struct MainAppStatus: Codable, Equatable, Sendable {
         var isChecking = false
         var lastCheckedAt: Date?
         var availableVersion: String?
+        var track: UpdateTrack = .stable  // tinycast-roseblud
     }
 
     var hiddenCommands: Set<CommandID> = []
