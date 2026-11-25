@@ -27,6 +27,8 @@ final class DictationCapture {
 
     var onLevels: (([Float]) -> Void)?
     var onLimit: (() -> Void)?
+    /// tinycast-roseblud: every accepted sample, on the capture queue, for a streaming recognizer.
+    var onSamples: (@Sendable (UnsafeBufferPointer<Float>) -> Void)?
 
     private(set) var isBluetooth = false
     private var session: AVCaptureSession?
@@ -73,7 +75,7 @@ final class DictationCapture {
             },
             onLimit: { [weak self] in
                 Task { @MainActor [weak self] in self?.onLimit?() }
-            })
+            }, onSamples: onSamples)
         output.setSampleBufferDelegate(collector, queue: collector.queue)
         self.session = capture
         self.output = output
@@ -123,12 +125,17 @@ private final class AudioCollector: NSObject, AVCaptureAudioDataOutputSampleBuff
     private var reachedLimit = false
     private let onLevels: @Sendable ([Float]) -> Void
     private let onLimit: @Sendable () -> Void
+    private let onSamples: (@Sendable (UnsafeBufferPointer<Float>) -> Void)?
 
-    init(onLevels: @escaping @Sendable ([Float]) -> Void, onLimit: @escaping @Sendable () -> Void) throws {
+    init(
+        onLevels: @escaping @Sendable ([Float]) -> Void, onLimit: @escaping @Sendable () -> Void,
+        onSamples: (@Sendable (UnsafeBufferPointer<Float>) -> Void)? = nil
+    ) throws {
         spectrum = try DictationSpectrum()
         displayedLevels = [Float](repeating: 0, count: DictationSpectrum.barCount)
         self.onLevels = onLevels
         self.onLimit = onLimit
+        self.onSamples = onSamples
     }
 
     func captureOutput(
@@ -151,6 +158,7 @@ private final class AudioCollector: NSObject, AVCaptureAudioDataOutputSampleBuff
         let floats = data.assumingMemoryBound(to: Float.self)
         let accepted = min(count, DictationWire.maximumSamples - samples.count)
         samples.append(contentsOf: UnsafeBufferPointer(start: floats, count: accepted))
+        onSamples?(UnsafeBufferPointer(start: floats, count: accepted))
         if samples.count == DictationWire.maximumSamples, !reachedLimit {
             reachedLimit = true
             onLimit()
