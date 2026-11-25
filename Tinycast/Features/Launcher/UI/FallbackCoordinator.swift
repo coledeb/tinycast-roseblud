@@ -35,6 +35,7 @@ final class FallbackCoordinator {
     /// Nil for a quicklink deleted since the order was stored.
     func entry(for fallback: Fallback) -> AppEntry? {
         switch fallback {
+        case .builtin(.runInTerminal): return TerminalLauncher.entry()  // tinycast-roseblud
         case .builtin(let builtin): return CommandCatalog.makeEntry(builtin.command)
         case .quicklink(let id): return quicklinks.quicklink(id: id).map(AppEntry.init)
         }
@@ -45,6 +46,7 @@ final class FallbackCoordinator {
         case .builtin(.quickAI): core.quickAICoordinator.ask(query)
         case .builtin(.searchFiles): core.fileSearchCoordinator.show(query: query)
         case .builtin(.runShellCommand): core.customCommandCoordinator.runShellCommand(query)
+        case .builtin(.runInTerminal): TerminalLauncher.open(query, core: core)
         case .builtin(.define): core.dictionaryCoordinator.show(term: query)
         case .quicklink(let id): core.quicklinkCoordinator.openQuicklink(id: id, filling: query)
         }
@@ -72,7 +74,7 @@ final class FallbackCoordinator {
         case .quickAI: return settings.aiEnabled
         case .searchFiles: return settings.fileSearchEnabled
         // Its own capability: this shell is not the custom-command library's switch to hold.
-        case .runShellCommand: return true
+        case .runShellCommand, .runInTerminal: return true
         // Settings › Commands is Define's only switch, so hiding the command there hides this too.
         case .define: return visibility.isVisible(CommandCatalog.makeEntry(.define))
         }

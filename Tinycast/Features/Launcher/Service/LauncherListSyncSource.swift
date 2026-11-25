@@ -9,8 +9,9 @@ final class LauncherListSyncSource: SyncSource {
 
     private static let favoritesKey = "favorites"
     private static let fallbacksKey = "fallbacks"
-    /// A synced list may turn it off, never on: it runs what the query says.
-    private static let shellFallback = Fallback.builtin(.runShellCommand).id
+    /// A synced list may turn them off, never on: they run what the query says.
+    private static let shellFallbacks = [Fallback.Builtin.runShellCommand, .runInTerminal]
+        .map { Fallback.builtin($0).id }
 
     let id = SyncSourceID.launcherLists
     private let favorites: FavoritesStore
@@ -52,7 +53,7 @@ final class LauncherListSyncSource: SyncSource {
             let incoming = SyncPayload.decode(Fallbacks.self, from: data)
         {
             var disabled = Set(incoming.disabled)
-            if fallbacks.disabledIDs.contains(Self.shellFallback) { disabled.insert(Self.shellFallback) }
+            disabled.formUnion(Self.shellFallbacks.filter(fallbacks.disabledIDs.contains))
             fallbacks.replace(order: incoming.order, disabled: disabled)
         }
         return []
