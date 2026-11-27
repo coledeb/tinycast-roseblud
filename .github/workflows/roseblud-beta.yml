@@ -1,0 +1,175 @@
+name: "Roseblud · beta"
+
+# Every upstream Tinycast beta (a vX.Y.Z-beta.N prerelease on abue-ammar/tinycast) is released here as
+# the same tag, built from this fork's main once main carries it: main is sermelipharo's main, which
+# follows upstream's main within minutes, plus .roseblud/patches, already built and tested by
+# roseblud-sync.yml. sermelipharo publishes no betas, so there is no Space Edition beta to rebuild.
+# Same tag, version, asset names and prerelease flag as upstream's betas; the bundle id and name stay
+# this fork's, so one installed app follows either stream through About → Update Channel.
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Upstream beta tag to (re)release, e.g. v0.13.0-beta.145; empty = their newest"
+        type: string
+        required: false
+
+concurrency:
+  group: roseblud-beta
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  UPSTREAM_REPO: abue-ammar/tinycast
+  SIGNING_IDENTITY: Tinycast Cole Self-Signed
+  SUBJECT_PREFIX: "tinycast-roseblud: on space "
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      sha: ${{ steps.check.outputs.sha }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          INPUT_TAG: ${{ inputs.tag }}
+        # Read-only API calls on upstream; nothing here or below writes outside this repository.
+        run: |
+          skip() { echo "::notice::$1"; { echo "tag="; echo "sha="; } >> "$GITHUB_OUTPUT"; exit 0; }
+          TAG="$INPUT_TAG"
+          [ -n "$TAG" ] || TAG=$(gh release list -R "$UPSTREAM_REPO" -L 30 --exclude-drafts \
+              --json tagName,isPrerelease -q '.[] | select(.isPrerelease) | .tagName' |
+            grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$' | sort -V | tail -n1 || true)
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]] || skip "not a beta tag: '$TAG'"
+          # A beta whose release is out already leads nowhere: Beta takes that release instead.
+          STABLE=$(gh release view -R "$UPSTREAM_REPO" --json tagName -q .tagName)
+          TRIPLE="${TAG#v}"; TRIPLE="${TRIPLE%%-*}"
+          [ "$(printf '%s\n%s\n' "${STABLE#v}" "$TRIPLE" | sort -V | tail -n1)" != "${STABLE#v}" ] ||
+            skip "$TAG is superseded by upstream's $STABLE"
+          if [ -z "$INPUT_TAG" ] && gh release view "$TAG" -R "$REPO" > /dev/null 2>&1; then
+            skip "$TAG is already released here"
+          fi
+          # Only a main the sync generated, built and tested, and only once it carries the beta.
+          HEAD=$(gh api "repos/$REPO/commits/main" -q .sha)
+          MSG=$(gh api "repos/$REPO/commits/main" -q .commit.message | head -n1)
+          [[ "$MSG" == "$SUBJECT_PREFIX"* ]] || skip "main ${HEAD:0:7} is not a generated build yet; the sync will make one"
+          UPSTREAM_BASE=$(gh api "repos/$REPO/contents/.space/UPSTREAM?ref=$HEAD" -q .content | base64 -d | tr -d '\n')
+          STATUS=$(gh api "repos/$UPSTREAM_REPO/compare/$TAG...$UPSTREAM_BASE" -q .status)
+          case "$STATUS" in
+            ahead | identical) ;;
+            *) skip "main ${HEAD:0:7} is built on upstream ${UPSTREAM_BASE:0:7}, which lacks $TAG ($STATUS); waiting for sermelipharo's sync and ours" ;;
+          esac
+          if [ -z "$INPUT_TAG" ] && gh issue list --label roseblud-beta --state open \
+               --json title -q '.[].title' | grep -qxF "Beta blocked: $TAG + main ${HEAD:0:7}"; then
+            skip "$TAG on main ${HEAD:0:7} already failed; see the roseblud-beta issue"
+          fi
+          echo "tag=$TAG sha=$HEAD"
+          { echo "tag=$TAG"; echo "sha=$HEAD"; } >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: check
+    if: needs.check.outputs.tag != ''
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      TAG: ${{ needs.check.outputs.tag }}
+      SHA: ${{ needs.check.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.check.outputs.sha }}
+          fetch-depth: 0
+          token: ${{ secrets.ROSEBLUD_PUSH_TOKEN }}
+
+      - name: Select Xcode 27
+        run: |
+          XCODE_PATH="$(find -E /Applications -maxdepth 1 -type d -regex '.*/Xcode_27(\.[0-9]+)*\.app' | sort -V | tail -n1)"
+          [ -n "$XCODE_PATH" ] || { ls /Applications | grep -i xcode; exit 1; }
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+          # Upstream's beta numbering: the version is the tag, the build number its beta counter.
+          { echo "VERSION=${TAG#v}"; echo "BUILD=${TAG##*.}"; } >> "$GITHUB_ENV"
+
+      # main passed .roseblud/gate.sh in the sync that pushed this exact commit, so it is not re-run.
+      - name: Import signing certificate
+        env:
+          P12_BASE64: ${{ secrets.SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KPW="$(openssl rand -base64 24)"
+          echo "${P12_BASE64}" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KPW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KPW" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "${P12_PASSWORD}" -A -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KPW" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/"//g')
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Build signed app
+        run: |
+          xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp=none" \
+            PRODUCT_NAME="Tinycast" TINYCAST_BUNDLE_IDENTIFIER="com.tinycast.app" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
+            build
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app"
+          ./Scripts/verify-signature.sh "$APP"
+          codesign -dvvv "$APP" 2>&1 | grep -qx "Authority=$SIGNING_IDENTITY"
+          # The updater refuses a bundle whose version is not the tag's.
+          [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")" = "$VERSION" ]
+
+      - name: Package DMG and ZIP
+        run: |
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app"
+          STAGE="$(mktemp -d)"
+          cp -R "$APP" "$STAGE/"
+          ln -s /Applications "$STAGE/Applications"
+          mkdir -p dist
+          diskutil image create from "$STAGE" --format UDZO --volumeName "Tinycast" "dist/Tinycast-$VERSION.dmg"
+          ditto -c -k --keepParent --sequesterRsrc "$APP" "dist/Tinycast-$VERSION.zip"
+
+      # A prerelease, never Latest, as upstream publishes betas: stable copies never see it, and the
+      # repository's Latest stays the newest release. The tag lands on a commit main already has, whose
+      # messages scrub.sh cleaned, so pushing it posts nothing on upstream's issues.
+      - name: Publish beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          .roseblud/beta-notes.sh "$TAG" "$SHA" > "$RUNNER_TEMP/notes.md"
+          TITLE="Tinycast Beta $VERSION · Roseblud Edition"
+          ASSETS=("dist/Tinycast-$VERSION.dmg" "dist/Tinycast-$VERSION.zip")
+          OLD=$(git ls-remote origin "refs/tags/$TAG" | cut -f1)
+          git tag -f "$TAG" "$SHA"
+          git push --force-with-lease="refs/tags/$TAG:$OLD" origin "refs/tags/$TAG"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file "$RUNNER_TEMP/notes.md" --prerelease --latest=false
+          else
+            gh release create "$TAG" "${ASSETS[@]}" --verify-tag --prerelease --latest=false \
+              --title "$TITLE" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+
+      - name: Close blocked issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .roseblud/report.sh close beta
+
+      - name: Report blocked beta
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          .roseblud/report.sh open beta "Beta blocked: $TAG + main ${SHA:0:7}"
