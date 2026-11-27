@@ -333,7 +333,7 @@ A **fallback** is the other half of the query-driven idea: a command the query i
 offered under a `Use “…” with…` header **below every result**, whatever the query says. A contextual
 row leads because it recognised the query; a fallback trails because nothing did.
 
-`Fallback` (`Launcher/Model/`) is the whole vocabulary: `.builtin(Builtin)` for the four shipped
+`Fallback` (`Launcher/Model/`) is the whole vocabulary: `.builtin(Builtin)` for the five shipped
 destinations and `.quicklink(UUID)` for a user's own. `Builtin` exists rather than a bare `CommandID`
 so `FallbackCoordinator.run` is **exhaustive**: a fifth built-in cannot compile without saying where
 its query goes. `Fallback.id` is deliberately the row's own `AppEntry.id`, which is what lets a stored
@@ -344,6 +344,7 @@ order name a live row across a rename or a reinstall.
 | Quick AI          | a fresh Quick AI chat, question already sent (`QuickAICoordinator.ask`)               | `aiEnabled`                                               |
 | Search Files      | the file-search screen, already narrowed                                              | `fileSearchEnabled`                                       |
 | Run Shell Command | `/bin/zsh`, streamed into the Command Output window                                   | always                                                    |
+| Run in Terminal  | a new window of the terminal picked in Settings › Fallbacks (`TerminalLauncher`)       | always                                                    |
 | Define Word       | the dictionary screen, already showing the entry (see [dictionary.md](dictionary.md)) | the Define Word command is visible in Settings › Commands |
 | a quicklink       | its first `{argument}`                                                                | `quicklinksEnabled`, and the link has a placeholder       |
 
@@ -354,6 +355,18 @@ sends the row to Search Quicklinks with its header fields pre-filled (see
 [quicklinks.md](quicklinks.md#arguments)). The seed never fills the **selection** field: that one is
 not an `{argument}` and is resolved by replacing the context, so seeding it through `userArguments`
 would silently do nothing.
+
+**Run in Terminal is named and drawn after the terminal it opens** (*Run in Ghostty*, with
+Ghostty's icon; the terminal glyph only while the app is missing), from
+`TerminalChoice`, a fixed list of terminals whose AppleScript can open a window and type into its
+shell: Terminal (`do script`), Ghostty (`initial input`) and iTerm (`write text`). The picker lists
+the installed ones. `TerminalLauncher` runs that script off the main actor, so the query lands in the
+user's own interactive shell in `~`, with their aliases and history, and the window stays open on
+the output. Each terminal asks once for Automation; a refusal (-1743) says where to allow it. Terminal
+and iTerm reuse the window a cold launch opens; Ghostty always opens its own. Typing rather than a
+script file is deliberate: a `.command` file is announced as `'path'; exit` in a temp directory, and
+nesting an interactive shell inside it suspends the outer one on `SIGTTOU`. A synced fallback list
+can turn it off, never on, as with Run Shell Command.
 
 **Run Shell Command carries its own switch, not the custom-command library's.** Turning off Custom
 Commands hides a library of saved commands; it says nothing about a shell line someone types
