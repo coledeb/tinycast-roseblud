@@ -236,6 +236,8 @@ final class SettingsProcessController {
             if stagedBackup?.preview.id == id { discardStagedBackup() }
         case .checkForUpdates:
             core.updateCoordinator.checkForUpdates()
+        case .setUpdateTrack(let track):
+            core.setUpdateTrack(track)
         case .showSupport:
             core.supportCoordinator.showSupport()
         case .showOnboarding:
@@ -429,7 +431,8 @@ final class SettingsProcessController {
             mcpAuthentication: core.mcpOAuth.statuses,
             updates: MainAppStatus.Updates(
                 updatesItself: updates.updatesItself, isChecking: updates.isChecking,
-                lastCheckedAt: updates.lastCheckedAt, availableVersion: updates.availableVersion?.description),
+                lastCheckedAt: updates.lastCheckedAt, availableVersion: updates.availableVersion?.description,
+                track: core.updateChecker.track),
             extensions: extensionsStatus())
     }
 

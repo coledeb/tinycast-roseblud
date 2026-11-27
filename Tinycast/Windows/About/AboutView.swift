@@ -23,6 +23,7 @@ struct AboutView: View {
                 }
                 .settingsAnchor(.aboutAbout)
                 updates
+                UpdateTrackSection()  // tinycast-roseblud
                 links
                 support
             }
