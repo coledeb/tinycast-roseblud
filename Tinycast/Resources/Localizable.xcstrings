@@ -29409,6 +29409,110 @@
         }
       }
     },
+    "Beta" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bêta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ベータ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "베타"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бета"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试版"
+          }
+        }
+      }
+    },
+    "Betas built on upstream Tinycast's, and any newer release. Betas share your data and settings." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Betas auf Basis der Betas des ursprünglichen Tinycast und jedes neuere Release. Betas nutzen deine Daten und Einstellungen mit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Betas basadas en las del Tinycast original y cualquier versión más reciente. Las betas comparten tus datos y ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bêtas construites sur celles du Tinycast d’origine, et toute version plus récente. Les bêtas partagent vos données et réglages."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本家 Tinycast のベータを元にしたベータと、より新しいリリース。ベータはデータと設定を共有します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원본 Tinycast 베타를 기반으로 한 베타와 더 새로운 릴리스를 받습니다. 베타는 데이터와 설정을 공유합니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Betas baseadas nas do Tinycast original e qualquer versão mais nova. As betas compartilham seus dados e ajustes."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Беты на основе бет оригинального Tinycast и любой более новый релиз. Беты используют ваши данные и настройки."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基于原版 Tinycast 测试版构建的测试版，以及任何更新的正式版。测试版与你共用数据和设置。"
+          }
+        }
+      }
+    },
     "Between tiled windows and screen edges." : {
       "localizations" : {
         "de" : {
@@ -104659,6 +104763,58 @@
         }
       }
     },
+    "Releases only. Leaving Beta keeps the installed beta until a newer release ships." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur Releases. Beim Verlassen von Beta bleibt die installierte Beta, bis ein neueres Release erscheint."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo versiones estables. Al dejar Beta, se mantiene la beta instalada hasta que salga una versión más reciente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versions stables uniquement. En quittant Bêta, la bêta installée reste jusqu’à la sortie d’une version plus récente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正式リリースのみ。ベータをやめても、より新しいリリースが出るまでインストール済みのベータを使い続けます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정식 릴리스만 받습니다. 베타를 해제해도 더 새로운 릴리스가 나올 때까지 설치된 베타가 유지됩니다."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Somente versões estáveis. Ao sair do Beta, a beta instalada continua até sair uma versão mais nova."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Только релизы. После выхода из бета-канала установленная бета остаётся, пока не выйдет более новый релиз."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅正式版。离开测试版后，已安装的测试版会保留，直到有更新的正式版发布。"
+          }
+        }
+      }
+    },
     "Releasing it when idle frees memory. The next dictation takes a moment longer." : {
       "localizations" : {
         "de" : {
@@ -121195,6 +121351,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spotlight 的快捷键已关闭。"
+          }
+        }
+      }
+    },
+    "Stable" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stabil"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stable"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安定版"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "안정"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estável"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стабильный"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稳定版"
           }
         }
       }
@@ -142902,6 +143110,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全部更新"
+          }
+        }
+      }
+    },
+    "Update Channel" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update-Kanal"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canal de actualizaciones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canal de mise à jour"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデートチャンネル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트 채널"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canal de atualizações"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Канал обновлений"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新渠道"
           }
         }
       }

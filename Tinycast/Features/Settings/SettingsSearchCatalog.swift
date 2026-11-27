@@ -743,6 +743,8 @@ enum SettingsSearchCatalog {
         .init(
             .aboutAbout, "Check for Updates",
             keywords: ["version", "upgrade", "release"]),
+        .init(  // tinycast-roseblud
+            .aboutAbout, "Update Channel", keywords: ["beta", "stable", "prerelease"]),
         .init(
             group: .aboutLinks, "Links",
             keywords: ["github", "source", "issues", "website"]),
