@@ -1,0 +1,29 @@
+diff --git a/Tinycast/Features/Settings/RaycastThemeSwitching.swift b/Tinycast/Features/Settings/RaycastThemeSwitching.swift
+index d7eedaefe9f8a16bbc5464d1340f2d86e261be36..04e02cdec3dca8e9782b67ee49798cdd80887362 100644
+--- a/Tinycast/Features/Settings/RaycastThemeSwitching.swift
++++ b/Tinycast/Features/Settings/RaycastThemeSwitching.swift
+@@ -145,7 +145,7 @@ extension SpaceTheme {
+ }
+ 
+ /// tinycast-space: the palette's theme gradient behind its glass. The window resizes at once, so
+-/// the gradient fades instead: in over the whole panel as it expands; out as it collapses, left in
++/// the gradient fills the whole panel at once as it expands; it fades out as it collapses, left in
+ /// the compact capsule's shape under the bar's glass, so no frame shows around the bar. With *Theme
+ /// the compact bar* on, the bar's own tinted glass is the compact surface, so the gradient is gone
+ /// as soon as the palette collapses.
+@@ -180,11 +180,13 @@ struct SpaceThemeBackdrop: ViewModifier {
+                         // The shape snaps with the window; only the opacity moves.
+                         .transaction { $0.animation = nil }
+                     }
+-                    .opacity(themesCompactBar && collapsed ? 0 : shown)
++                    // tinycast-roseblud: in at once, as the window snaps open; a fade showed bare glass.
++                    .opacity(collapsed ? (themesCompactBar ? 0 : shown) : 1)
++                    .animation(nil, value: collapsed)
+                     .allowsHitTesting(false)
+             }
+             .onChange(of: collapsed) { _, collapsed in
+-                withAnimation(.easeInOut(duration: 0.3)) { shown = collapsed ? 0 : 1 }
++                if collapsed { withAnimation(.easeInOut(duration: 0.3)) { shown = 0 } } else { shown = 1 }
+             }
+     }
+ }
