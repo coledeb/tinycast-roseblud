@@ -863,6 +863,7 @@ run UpdatesTests           Tinycast/Features/Updates/Model/*.swift \
                            Tinycast/Features/Updates/Service/UpdateSignature.swift
 run UpdateCheckTests       Tinycast/Features/Updates/Model/*.swift \
                            Tinycast/Features/Updates/Service/UpdateCheckStore.swift \
+                           Tinycast/Features/Updates/Service/UpdateFailure.swift \
                            Tinycast/Platform/AppPaths.swift
 run SupportTests           Tinycast/Features/Support/Model/*.swift
 run AIProviderTests        Tinycast/Features/Settings/AppSettingsKey.swift \
