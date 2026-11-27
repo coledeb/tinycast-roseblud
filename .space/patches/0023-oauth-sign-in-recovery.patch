@@ -1,0 +1,84 @@
+diff --git a/Scripts/raycast-runtime/fixtures.mjs b/Scripts/raycast-runtime/fixtures.mjs
+index 4a6190484a9e9eeaed742a753ba6c1a1e4dc5777..d38d1efac50f9d749fb9012abea6ef6b0f87c58b 100644
+--- a/Scripts/raycast-runtime/fixtures.mjs
++++ b/Scripts/raycast-runtime/fixtures.mjs
+@@ -483,6 +483,18 @@ export default async function Command() {
+ }
+ `;
+ 
++const oauthQueueSource = `
++import { OAuth } from "@raycast/api";
++
++export default async function Command() {
++  const client = new OAuth.PKCEClient({ redirectMethod: OAuth.RedirectMethod.Web, providerName: "GitHub" });
++  const settle = (promise) => promise.then((value) => ({ value }), (error) => ({ error: error.message }));
++  const first = settle(client.authorize({ url: "https://auth.example.test/first" }));
++  const second = settle(client.authorize({ url: "https://auth.example.test/second" }));
++  globalThis.__oauthQueue = Promise.all([first, second]);
++}
++`;
++
+ const formDataSource = `
+ export default async function Command() {
+   const form = new FormData();
+@@ -1360,6 +1372,31 @@ export async function runFixtures() {
+     },
+   );
+ 
++  const queuedSignIns = [];
++  let cancelFirst;
++  await run(
++    "concurrent OAuth sign-ins run one after another and a cancelled one settles",
++    oauthQueueSource,
++    "no-view",
++    async (harness) => {
++      check("only the first sign-in opens the browser", queuedSignIns.length === 1, JSON.stringify(queuedSignIns));
++      cancelFirst(new Error("Sign-in was cancelled."));
++      const [first, second] = await harness.call("globalThis.__oauthQueue");
++      check("a cancelled sign-in rejects with the host's error", first?.error?.includes("Sign-in was cancelled."), JSON.stringify(first));
++      check("the next sign-in starts after the failure", queuedSignIns.length === 2 && queuedSignIns[1].endsWith("/second"), JSON.stringify(queuedSignIns));
++      check("the queued sign-in still succeeds", second?.value?.authorizationCode === "code-2", JSON.stringify(second));
++    },
++    {
++      stubs: {
++        "oauth.authorize": ([url]) => {
++          queuedSignIns.push(url);
++          if (queuedSignIns.length === 1) return new Promise((_, reject) => (cancelFirst = reject));
++          return "raycast://oauth?code=code-2";
++        },
++      },
++    },
++  );
++
+   const formPosts = [];
+   await run(
+     "FormData holds entries and serialises as multipart",
+diff --git a/Scripts/raycast-runtime/src/api/oauth.js b/Scripts/raycast-runtime/src/api/oauth.js
+index db23b69aaf30f50b274a1d8cb64f181ed0c372f1..fb01aae85e48e7d4b89aa39b6f09f28db421dab9 100644
+--- a/Scripts/raycast-runtime/src/api/oauth.js
++++ b/Scripts/raycast-runtime/src/api/oauth.js
+@@ -18,6 +18,15 @@ const redirects = {
+ 
+ const expiryMarginSeconds = 10;
+ 
++// The host runs one browser sign-in at a time, so concurrent authorize() calls take turns.
++let authorizationQueue = Promise.resolve();
++
++function authorizeInBrowser(url, scheme) {
++  const result = authorizationQueue.then(() => hostCall("oauth", "authorize", [url, scheme]));
++  authorizationQueue = result.then(() => {}, () => {});
++  return result;
++}
++
+ const randomURLSafe = (size) => nodeModules.crypto.randomBytes(size).toString("base64url");
+ 
+ // The hosted redirect page reads its target scheme out of `state`, so it must be encoded JSON.
+@@ -72,7 +81,7 @@ class PKCEClient {
+   async authorize(request) {
+     const url = typeof request.toURL === "function" ? request.toURL() : request.url;
+     const sentState = new URL(url).searchParams.get("state");
+-    const redirect = await hostCall("oauth", "authorize", [url, redirects[this.redirectMethod].scheme]);
++    const redirect = await authorizeInBrowser(url, redirects[this.redirectMethod].scheme);
+     const params = new URL(redirect).searchParams;
+     const error = params.get("error");
+     if (error) throw new Error(params.get("error_description") ?? error);
